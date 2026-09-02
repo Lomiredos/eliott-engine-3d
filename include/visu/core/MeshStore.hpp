@@ -6,13 +6,6 @@
 #include <vector>
 #include <filesystem>
 
-// ---------------------------------------------------------------------------
-// Magasin de meshes charges depuis des fichiers (.obj).
-//
-// Charge une fois, cache par chemin. Les donnees vivent cote CPU : elles
-// servent au DRAW (envoyees au GPU via le renderer, handle memorise) ET au
-// PICK (AABB testee contre le rayon). C'est le point de partage entre les deux.
-// ---------------------------------------------------------------------------
 
 namespace ee::core
 {

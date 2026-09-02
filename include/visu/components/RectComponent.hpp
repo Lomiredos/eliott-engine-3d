@@ -3,7 +3,6 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
-// Composant MOTEUR : une boite (largeur x hauteur x profondeur).
 struct RectComponent
 {
     float width = 1.0f;

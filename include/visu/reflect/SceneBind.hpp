@@ -4,15 +4,6 @@
 #include "visu/reflect/FieldVisitor.hpp"
 #include "visu/core/SceneInfo.hpp"
 
-// ---------------------------------------------------------------------------
-// Pont scene dynamique -> struct typee.
-//
-// LoadVisitor lit les valeurs (map dynamique) d'un ComponentInstance et remplit
-// les champs d'une struct via Reflect<T>. C'est le desérialiseur runtime :
-// il transforme la donnee authoree (scene.json) en composants C++ typés qu'on
-// pousse dans le World. Aplatissement inverse : un Vector3 se relit depuis
-// nomX/nomY/nomZ (symetrique de CatalogGen).
-// ---------------------------------------------------------------------------
 
 namespace ee::reflection
 {
@@ -32,7 +23,6 @@ namespace ee::reflection
         const ComponentInstance &m_comp;
     };
 
-    // Construit un T typé depuis un ComponentInstance (defauts de T{} si champ absent).
     template <typename T>
     T loadFromInstance(const ComponentInstance &_comp)
     {

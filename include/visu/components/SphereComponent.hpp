@@ -3,7 +3,6 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
-// Composant MOTEUR : une sphere de rayon donne.
 struct SphereComponent
 {
     float radius = 1.0f;

@@ -5,7 +5,6 @@
 
 #include <string>
 
-// Composant MOTEUR : un mesh charge depuis un .obj (chemin relatif au projet).
 struct MeshComponent
 {
     std::string path;

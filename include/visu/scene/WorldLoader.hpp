@@ -1,34 +1,13 @@
 #pragma once
 
-// ---------------------------------------------------------------------------
-// Chargeur scene (donnees dynamiques) -> World typé (eliott-ecs).
-//
-// Header-only et OPT-IN : seul le JEU l'inclut. ee-core.lib n'est donc PAS
-// couplee a eliott-ecs (l'editeur, qui reste dynamique, ne voit jamais ce
-// fichier). Ici on marie les deux mondes : ee-core (reflexion + composants
-// moteur) et eliott-ecs (World).
-//
-// Un WorldRegistry mappe un NOM de composant vers :
-//   - un "add" : instancie la struct typée depuis le ComponentInstance (via la
-//     reflexion) et l'ajoute au World ;
-//   - un "componentId" : le bit de signature (getComponentID<T>).
-// -> permet de desérialiser une scene ET de construire les signatures des
-//    systemes a partir des noms de systems.json.
-// ---------------------------------------------------------------------------
-
 #include "ecs/World.hpp"
-#include "ecs/ComponentRegistry.hpp" // getComponentID, Signature, EntityID
+#include "ecs/ComponentRegistry.hpp"
 
 #include "visu/core/SceneInfo.hpp"
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/SceneBind.hpp"
 
-// Composants MOTEUR (leur struct + Reflect).
-#include "visu/components/TransformComponent.hpp"
-#include "visu/components/SphereComponent.hpp"
-#include "visu/components/RectComponent.hpp"
-#include "visu/components/CapsuleComponent.hpp"
-#include "visu/components/MeshComponent.hpp"
+#include "visu/components/Components.hpp"
 
 #include <functional>
 #include <string>
@@ -46,7 +25,6 @@ namespace ee::scene
             std::function<size_t()> componentId;
         };
 
-        // Enregistre un composant typé T (doit specialiser Reflect<T>).
         template <typename T>
         void reg()
         {
@@ -66,7 +44,6 @@ namespace ee::scene
             return it == m_entries.end() ? nullptr : &it->second;
         }
 
-        // Signature (bitset) a partir d'une liste de noms de composants.
         ee::ecs::Signature signatureOf(const std::vector<std::string> &_names) const
         {
             ee::ecs::Signature sig;
@@ -80,7 +57,6 @@ namespace ee::scene
         std::unordered_map<std::string, Entry> m_entries;
     };
 
-    // Enregistre les composants MOTEUR (Transform + formes).
     inline void registerEngineComponents(WorldRegistry &_reg)
     {
         _reg.reg<TransformComponent>();
@@ -88,9 +64,9 @@ namespace ee::scene
         _reg.reg<RectComponent>();
         _reg.reg<CapsuleComponent>();
         _reg.reg<MeshComponent>();
+        _reg.reg<RigideBodyComponent>();
     }
 
-    // Instancie la scene authoree dans un World typé. Renvoie les EntityID crees.
     inline std::vector<ee::ecs::EntityID> loadSceneIntoWorld(ee::ecs::World &_world,
                                                              const SceneInfo &_scene,
                                                              const WorldRegistry &_reg)

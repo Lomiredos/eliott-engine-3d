@@ -19,6 +19,7 @@
 #include "visu/scene/WorldLoader.hpp"
 #include "visu/scene/SystemHost.hpp"
 #include "visu/scene/WorldRender.hpp"
+#include "visu/scene/EngineSystems.hpp"
 
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
@@ -29,6 +30,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 namespace ee::runtime
 {
@@ -82,7 +84,13 @@ namespace ee::runtime
         // 3) Systemes AVANT le chargement (le flush les peuple).
         std::vector<SystemInfo> schedule =
             loadSystemsInDir(_cfg.projectRoot + "/systems");
+        std::vector<SystemInfo> engineSchedule =
+            ee::scene::engineSystemInfos();
+        schedule.insert(schedule.end(), engineSchedule.begin(), engineSchedule.end());
+        std::stable_sort(schedule.begin(), schedule.end(), [](const SystemInfo& _a, const SystemInfo& _b)
+        {return _a.priority < _b.priority;});
         ee::scene::SystemHost host;
+        ee::scene::registerEngineSystems(host);
         if (_registerSystems)
             _registerSystems(host);
         host.build(world, reg, schedule);

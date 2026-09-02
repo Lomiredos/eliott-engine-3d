@@ -3,7 +3,6 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
-// Composant MOTEUR : une capsule (rayon + hauteur du cylindre central).
 struct CapsuleComponent
 {
     float radius = 0.5f;
