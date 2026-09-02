@@ -26,6 +26,8 @@ add_library(ee-core STATIC
     src/systems/PickingSystem.cpp
     src/systems/SystemScheduler.cpp
     src/reflect/CatalogGen.cpp
+    src/reflect/SceneBind.cpp
+    src/input/Input.cpp
 )
 
 # PUBLIC : tout consommateur herite de ces include dirs (dont eliott-math).
