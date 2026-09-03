@@ -89,7 +89,9 @@ namespace ee::runtime
         schedule.insert(schedule.end(), engineSchedule.begin(), engineSchedule.end());
         std::stable_sort(schedule.begin(), schedule.end(), [](const SystemInfo& _a, const SystemInfo& _b)
         {return _a.priority < _b.priority;});
+        
         ee::scene::SystemHost host;
+
         ee::scene::registerEngineSystems(host);
         if (_registerSystems)
             _registerSystems(host);

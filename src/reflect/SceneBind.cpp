@@ -62,4 +62,25 @@ namespace ee::reflection
         _value.y = ee::scene::getFloat(m_comp, s + "Y", _value.y);
         _value.z = ee::scene::getFloat(m_comp, s + "Z", _value.z);
     }
+
+    void LoadVisitor::visitEnum(const char *_name, int& _value, const char* const* _labels, int _count) {
+        auto it = m_comp.values.find(_name);
+        if (it == m_comp.values.end())
+            return;
+
+        if (auto p = std::get_if<int>(&it->second)){
+            if (*p >= 0 && *p < _count)
+                _value = *p;
+            return;
+        }
+
+        if (auto p = std::get_if<std::string>(&it->second)){
+            for (int i = 0; i < _count; ++i){
+                if (*p == _labels[i]){
+                    _value = i;
+                    return;
+                }
+            }
+        }
+    }
 }

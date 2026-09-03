@@ -37,7 +37,6 @@ namespace ee::reflection
 
     void CatalogVisitor::visit(const char *_name, ee::math::Vector3<float> &_value)
     {
-        // Option A : aplati en 3 floats <nom>X/Y/Z.
         std::string s(_name);
         fields.push_back(makeField(s + "X", "float", _value.x));
         fields.push_back(makeField(s + "Y", "float", _value.y));
@@ -45,13 +44,24 @@ namespace ee::reflection
     }
     void CatalogVisitor::visit(const char *_name, ee::math::Quaternion &_value)
     {
-        // TODO: exposer en euler (rotX/Y/Z) plus editable. Provisoire : raw wxyz.
         std::string s(_name);
         fields.push_back(makeField(s + "W", "float", _value.w));
         fields.push_back(makeField(s + "X", "float", _value.x));
         fields.push_back(makeField(s + "Y", "float", _value.y));
         fields.push_back(makeField(s + "Z", "float", _value.z));
     }
+
+    void CatalogVisitor::visitEnum(const char *_name, int& _value, const char* const* _labels, int _count)
+    {
+        nlohmann::json options = nlohmann::json::array();
+        for (int i = 0; i < _count; i++){
+            options.push_back(_labels[i]);
+        }
+        nlohmann::json f = makeField(_name, "enum", _labels[_value]);
+        f["options"] = options;
+        field.push_back(f);
+    } 
+
 
     void writeCatalog(const nlohmann::json &_components, const std::filesystem::path &_out)
     {

@@ -21,6 +21,7 @@ namespace ee::reflection
         void visit(const char *_name, std::string &_value) override;
         void visit(const char *_name, ee::math::Vector3<float> &_value) override;
         void visit(const char *_name, ee::math::Quaternion &_value) override;
+        void visitEnum(const char *_name, int& _value, const char* const* _labels, int _count) override;
     };
 
     template <typename T>
