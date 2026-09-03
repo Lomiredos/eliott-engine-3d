@@ -19,14 +19,8 @@ struct ee::reflection::Reflect<TransformComponent>
 
     static void visit(TransformComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("x", _c.position.x);
-        _v.visit("y", _c.position.y);
-        _v.visit("z", _c.position.z);
-        _v.visit("rotX", _c.euler.x);
-        _v.visit("rotY", _c.euler.y);
-        _v.visit("rotZ", _c.euler.z);
-        _v.visit("scaleX", _c.scale.x);
-        _v.visit("scaleY", _c.scale.y);
-        _v.visit("scaleZ", _c.scale.z);
+        _v.visit("Position", _c.position);
+        _v.visit("Euleur", _c.euler);
+        _v.visit("Scale", _c.scale);
     }
 };

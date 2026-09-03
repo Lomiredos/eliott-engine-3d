@@ -3,11 +3,12 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
+#include "math/Vector3.hpp"
+
 struct RectComponent
 {
-    float width = 1.0f;
-    float height = 1.0f;
-    float depth = 1.0f;
+
+    ee::math::Vector3<float> size{1.0f, 1.0f, 1.0f};
 };
 
 template <>
@@ -17,8 +18,6 @@ struct ee::reflection::Reflect<RectComponent>
 
     static void visit(RectComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("width", _c.width);
-        _v.visit("height", _c.height);
-        _v.visit("depth", _c.depth);
+        _v.visit("size", _c.size);
     }
 };
