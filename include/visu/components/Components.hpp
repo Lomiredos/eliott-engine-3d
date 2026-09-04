@@ -6,3 +6,4 @@
 #include "visu/components/CapsuleComponent.hpp"
 #include "visu/components/MeshComponent.hpp"
 #include "visu/components/RigideBodyComponent.hpp"
+#include "visu/components/ColliderComponent.hpp"

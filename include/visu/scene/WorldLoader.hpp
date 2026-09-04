@@ -65,6 +65,7 @@ namespace ee::scene
         _reg.reg<CapsuleComponent>();
         _reg.reg<MeshComponent>();
         _reg.reg<RigideBodyComponent>();
+        _reg.reg<ColliderComponent>();
     }
 
     inline std::vector<ee::ecs::EntityID> loadSceneIntoWorld(ee::ecs::World &_world,

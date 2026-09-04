@@ -51,17 +51,17 @@ namespace ee::reflection
         fields.push_back(makeField(s + "Z", "float", _value.z));
     }
 
-    void CatalogVisitor::visitEnum(const char *_name, int& _value, const char* const* _labels, int _count)
+    void CatalogVisitor::visitEnum(const char *_name, int &_value, const char *const *_labels, int _count)
     {
         nlohmann::json options = nlohmann::json::array();
-        for (int i = 0; i < _count; i++){
+        for (int i = 0; i < _count; i++)
+        {
             options.push_back(_labels[i]);
         }
         nlohmann::json f = makeField(_name, "enum", _labels[_value]);
         f["options"] = options;
-        field.push_back(f);
-    } 
-
+        fields.push_back(f);
+    }
 
     void writeCatalog(const nlohmann::json &_components, const std::filesystem::path &_out)
     {
