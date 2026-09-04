@@ -121,13 +121,18 @@ namespace ee::math
                 *this /= Magnetude();
         }
 
-        T Distance(const Vector3<T> &_other) const
+        T DistanceSquared(const Vector3<T> &_other) const
         {
             T dx = x - _other.x;
             T dy = y - _other.y;
             T dz = z - _other.z;
 
-            return std::sqrt(dx * dx + dy * dy + dz * dz);
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        T Distance(const Vector3<T> &_other) const
+        {
+            return std::sqrt(DistanceSquared(_other));
         };
 
         T Dot(const Vector3<T> &_other) const
