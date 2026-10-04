@@ -27,7 +27,7 @@
 namespace ee::scene
 {
     // Instancie un systeme de type T dans le World avec sa signature.
-    using SystemFactory = std::function<std::shared_ptr<ee::ecs::System>(
+    using SystemFactory = std::function<std::shared_ptr<ee::ecs::UpdateSystem>(
         ee::ecs::World &, const WorldRegistry &, const std::vector<std::string> &)>;
 
     template <typename T>
@@ -38,7 +38,7 @@ namespace ee::scene
         {
             std::shared_ptr<T> s = _w.registerSystem<T>();
             _w.setSystemSignature<T>(_reg.signatureOf(_sigNames));
-            return std::static_pointer_cast<ee::ecs::System>(s);
+            return std::static_pointer_cast<ee::ecs::UpdateSystem>(s);
         };
     }
 
@@ -73,6 +73,6 @@ namespace ee::scene
 
     private:
         std::unordered_map<std::string, SystemFactory> m_factories;
-        std::vector<std::shared_ptr<ee::ecs::System>> m_ordered;
+        std::vector<std::shared_ptr<ee::ecs::UpdateSystem>> m_ordered;
     };
 }

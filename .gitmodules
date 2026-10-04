@@ -1,0 +1,6 @@
+[submodule "extern/eliott-ecs"]
+	path = extern/eliott-ecs
+	url = https://github.com/Lomiredos/eliott-ecs
+[submodule "extern/eliott-input"]
+	path = extern/eliott-input
+	url = https://github.com/Lomiredos/eliott-input

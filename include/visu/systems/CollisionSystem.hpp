@@ -92,7 +92,7 @@ inline Contact SphereToBox(const ee::math::Vector3<float> &_sphereCenter, float 
     return {true, _boxRot.rotate(nLocal), depth};
 }
 
-class CollisionSystem : public ee::ecs::System
+class CollisionSystem : public ee::ecs::UpdateSystem
 {
 public:
     void update(ee::ecs::World &_world, float _dt) override;
@@ -106,22 +106,22 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt)
     {
         ee::ecs::EntityID idA = ents[i];
 
-        ColliderComponent &cc = _world.getComponent<ColliderComponent>(idA);
-        TransformComponent &tf = _world.getComponent<TransformComponent>(idA);
+        ColliderComponent &cc = *_world.getComponent<ColliderComponent>(idA);
+        TransformComponent &tf = *_world.getComponent<TransformComponent>(idA);
 
         if (!cc.isActive)
             continue;
 
         RigideBodyComponent *rbA = nullptr;
         if (_world.hasComponent<RigideBodyComponent>(idA))
-            rbA = &_world.getComponent<RigideBodyComponent>(idA);
+            rbA = _world.getComponent<RigideBodyComponent>(idA);
 
         for (size_t j = i + 1; j < ents.size(); ++j)
         {
             ee::ecs::EntityID idB = ents[j];
 
-            ColliderComponent &occ = _world.getComponent<ColliderComponent>(idB);
-            TransformComponent &otf = _world.getComponent<TransformComponent>(idB);
+            ColliderComponent &occ = *_world.getComponent<ColliderComponent>(idB);
+            TransformComponent &otf = *_world.getComponent<TransformComponent>(idB);
 
             if (!occ.isActive)
                 continue;
@@ -154,7 +154,7 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt)
 
             RigideBodyComponent *rbB = nullptr;
             if (_world.hasComponent<RigideBodyComponent>(idB))
-                rbB = &_world.getComponent<RigideBodyComponent>(idB);
+                rbB = _world.getComponent<RigideBodyComponent>(idB);
 
             // ##TODO trigger : si cc.isTrigger || occ.isTrigger -> emettre un
             //        TriggerEvent et NE PAS resoudre (ni position, ni vitesse).

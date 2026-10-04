@@ -15,11 +15,13 @@
 #include "visu/core/SceneInfo.hpp"
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/GLRenderer.hpp"
-#include "visu/input/Input.hpp"
 #include "visu/scene/WorldLoader.hpp"
 #include "visu/scene/SystemHost.hpp"
 #include "visu/scene/WorldRender.hpp"
 #include "visu/scene/EngineSystems.hpp"
+
+#include "input/InputManager.hpp"
+#include "input/Keys.hpp"
 
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
@@ -29,6 +31,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <algorithm>
 
@@ -36,7 +39,8 @@ namespace ee::runtime
 {
     struct Config
     {
-        std::string projectRoot;             // scene.json, systems/, base des .obj
+        std::string projectRoot;             // Assets/ScenesDatas/, systems/, base des .obj
+        std::string sceneName = "BaseScene";  // Assets/ScenesDatas/<sceneName>.json
         std::string windowTitle = "Game";
         int width = 1000;
         int height = 700;
@@ -48,14 +52,129 @@ namespace ee::runtime
 
     namespace detail
     {
+        // Table GLFW <-> ee::input::Key, dans le MEME ORDRE que l'enum Key
+        // (meme convention que s_keyTable cote SDL dans eliott-input).
+        // La taille est deduite du tableau -> jamais de constante a resynchroniser
+        // a la main si Keys.hpp change.
+        inline const int *glfwKeyTable(int &_count)
+        {
+            static constexpr int table[] = {
+                // Letters
+                GLFW_KEY_A, GLFW_KEY_B, GLFW_KEY_C, GLFW_KEY_D, GLFW_KEY_E, GLFW_KEY_F,
+                GLFW_KEY_G, GLFW_KEY_H, GLFW_KEY_I, GLFW_KEY_J, GLFW_KEY_K, GLFW_KEY_L,
+                GLFW_KEY_M, GLFW_KEY_N, GLFW_KEY_O, GLFW_KEY_P, GLFW_KEY_Q, GLFW_KEY_R,
+                GLFW_KEY_S, GLFW_KEY_T, GLFW_KEY_U, GLFW_KEY_V, GLFW_KEY_W, GLFW_KEY_X,
+                GLFW_KEY_Y, GLFW_KEY_Z,
+                // Numbers
+                GLFW_KEY_0, GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4,
+                GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9,
+                // Function keys
+                GLFW_KEY_F1, GLFW_KEY_F2, GLFW_KEY_F3, GLFW_KEY_F4, GLFW_KEY_F5, GLFW_KEY_F6,
+                GLFW_KEY_F7, GLFW_KEY_F8, GLFW_KEY_F9, GLFW_KEY_F10, GLFW_KEY_F11, GLFW_KEY_F12,
+                // Navigation
+                GLFW_KEY_UP, GLFW_KEY_DOWN, GLFW_KEY_LEFT, GLFW_KEY_RIGHT,
+                GLFW_KEY_HOME, GLFW_KEY_END, GLFW_KEY_PAGE_UP, GLFW_KEY_PAGE_DOWN,
+                GLFW_KEY_INSERT, GLFW_KEY_DELETE,
+                // Modifiers
+                GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT,
+                GLFW_KEY_LEFT_CONTROL, GLFW_KEY_RIGHT_CONTROL,
+                GLFW_KEY_LEFT_ALT, GLFW_KEY_RIGHT_ALT,
+                GLFW_KEY_LEFT_SUPER, GLFW_KEY_RIGHT_SUPER,
+                // Special
+                GLFW_KEY_SPACE, GLFW_KEY_ENTER, GLFW_KEY_BACKSPACE,
+                GLFW_KEY_TAB, GLFW_KEY_ESCAPE, GLFW_KEY_CAPS_LOCK,
+                // Punctuation
+                GLFW_KEY_MINUS, GLFW_KEY_EQUAL,
+                GLFW_KEY_LEFT_BRACKET, GLFW_KEY_RIGHT_BRACKET,
+                GLFW_KEY_BACKSLASH, GLFW_KEY_SEMICOLON,
+                GLFW_KEY_APOSTROPHE, GLFW_KEY_GRAVE_ACCENT,
+                GLFW_KEY_COMMA, GLFW_KEY_PERIOD, GLFW_KEY_SLASH,
+                // System
+                GLFW_KEY_PRINT_SCREEN, GLFW_KEY_SCROLL_LOCK, GLFW_KEY_PAUSE,
+                // Numpad
+                GLFW_KEY_KP_0, GLFW_KEY_KP_1, GLFW_KEY_KP_2, GLFW_KEY_KP_3, GLFW_KEY_KP_4,
+                GLFW_KEY_KP_5, GLFW_KEY_KP_6, GLFW_KEY_KP_7, GLFW_KEY_KP_8, GLFW_KEY_KP_9,
+                GLFW_KEY_KP_ADD, GLFW_KEY_KP_SUBTRACT, GLFW_KEY_KP_MULTIPLY, GLFW_KEY_KP_DIVIDE,
+                GLFW_KEY_KP_ENTER, GLFW_KEY_KP_DECIMAL, GLFW_KEY_NUM_LOCK,
+            };
+            // Si Keys.hpp gagne/perd une entree sans que cette table suive, ca
+            // casse ici a la compilation plutot qu'en silence a l'execution.
+            static_assert(sizeof(table) / sizeof(table[0]) ==
+                              static_cast<int>(ee::input::Key::NumLock) + 1,
+                          "glfwKeyTable() desynchronise de l'enum ee::input::Key");
+            _count = static_cast<int>(sizeof(table) / sizeof(table[0]));
+            return table;
+        }
+
+        // Lit GLFW chaque frame et nourrit InputManager via les Sync* (pas de
+        // fenetre SDL3 ici -> pas d'update()/event-pump SDL possible).
         inline void pollInput(GLFWwindow *_win)
         {
-            ee::input::InputState in;
-            if (glfwGetKey(_win, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(_win, GLFW_KEY_Z) == GLFW_PRESS) in.moveZ -= 1.0f;
-            if (glfwGetKey(_win, GLFW_KEY_S) == GLFW_PRESS) in.moveZ += 1.0f;
-            if (glfwGetKey(_win, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(_win, GLFW_KEY_Q) == GLFW_PRESS) in.moveX -= 1.0f;
-            if (glfwGetKey(_win, GLFW_KEY_D) == GLFW_PRESS) in.moveX += 1.0f;
-            ee::input::state() = in;
+            using ee::input::InputManager;
+            InputManager &im = InputManager::getInstance();
+            int keyCount = 0;
+            const int *table = glfwKeyTable(keyCount);
+
+            static std::unordered_map<int, bool> s_prevKey;
+            for (int i = 0; i < keyCount; ++i)
+            {
+                int glfwKey = table[i];
+                bool now = glfwGetKey(_win, glfwKey) == GLFW_PRESS;
+                bool was = s_prevKey[glfwKey];
+                im.SyncKey(static_cast<ee::input::Key>(i), now && !was, now && was, !now && was);
+                s_prevKey[glfwKey] = now;
+            }
+
+            static const int s_mouseTable[] = {
+                GLFW_MOUSE_BUTTON_LEFT, GLFW_MOUSE_BUTTON_MIDDLE, GLFW_MOUSE_BUTTON_RIGHT,
+                GLFW_MOUSE_BUTTON_4, GLFW_MOUSE_BUTTON_5, // X1, X2
+            };
+            static std::unordered_map<int, bool> s_prevMouse;
+            for (int i = 0; i < 5; ++i)
+            {
+                int glfwBtn = s_mouseTable[i];
+                bool now = glfwGetMouseButton(_win, glfwBtn) == GLFW_PRESS;
+                bool was = s_prevMouse[glfwBtn];
+                im.SyncMouseButton(static_cast<ee::input::MouseButton>(i), now && !was, now && was, !now && was);
+                s_prevMouse[glfwBtn] = now;
+            }
+
+            double mx, my;
+            glfwGetCursorPos(_win, &mx, &my);
+            im.SyncMousePosition(static_cast<float>(mx), static_cast<float>(my));
+
+            // Manette (1ere connectee) : API gamepad de GLFW, independante de SDL.
+            GLFWgamepadstate pad;
+            if (glfwGetGamepadState(GLFW_JOYSTICK_1, &pad))
+            {
+                static const int s_padButtonMap[] = {
+                    GLFW_GAMEPAD_BUTTON_A, GLFW_GAMEPAD_BUTTON_B,
+                    GLFW_GAMEPAD_BUTTON_X, GLFW_GAMEPAD_BUTTON_Y,
+                    GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER,
+                    GLFW_GAMEPAD_BUTTON_LEFT_THUMB, GLFW_GAMEPAD_BUTTON_RIGHT_THUMB,
+                    GLFW_GAMEPAD_BUTTON_START, GLFW_GAMEPAD_BUTTON_BACK,
+                    GLFW_GAMEPAD_BUTTON_GUIDE,
+                    GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_GAMEPAD_BUTTON_DPAD_DOWN,
+                    GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT,
+                };
+                static std::unordered_map<int, bool> s_prevPad;
+                for (int i = 0; i < 15; ++i)
+                {
+                    int glfwBtn = s_padButtonMap[i];
+                    bool now = pad.buttons[glfwBtn] == GLFW_PRESS;
+                    bool was = s_prevPad[glfwBtn];
+                    im.SyncGamepadButton(static_cast<ee::input::GamepadButton>(i), now && !was, now && was, !now && was);
+                    s_prevPad[glfwBtn] = now;
+                }
+
+                static const int s_padAxisMap[] = {
+                    GLFW_GAMEPAD_AXIS_LEFT_X, GLFW_GAMEPAD_AXIS_LEFT_Y,
+                    GLFW_GAMEPAD_AXIS_RIGHT_X, GLFW_GAMEPAD_AXIS_RIGHT_Y,
+                    GLFW_GAMEPAD_AXIS_LEFT_TRIGGER, GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER,
+                };
+                for (int i = 0; i < 6; ++i)
+                    im.SyncGamepadAxis(static_cast<ee::input::GamepadAxis>(i), pad.axes[s_padAxisMap[i]]);
+            }
         }
     }
 
@@ -64,7 +183,7 @@ namespace ee::runtime
                    const RegisterSystemsFn &_registerSystems)
     {
         // 1) Scene authoree.
-        std::string scenePath = _cfg.projectRoot + "/assets/scene.json";
+        std::string scenePath = _cfg.projectRoot + "/Assets/ScenesDatas/" + _cfg.sceneName + ".json";
         std::optional<SceneInfo> scene = loadScene(scenePath);
         if (!scene)
         {

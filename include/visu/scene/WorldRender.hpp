@@ -34,14 +34,14 @@ namespace ee::scene
             if (!_w.hasComponent<TransformComponent>(e))
                 continue;
 
-            TransformComponent &t = _w.getComponent<TransformComponent>(e);
+            TransformComponent &t = *_w.getComponent<TransformComponent>(e);
             ee::render::Vec3 pos{t.position.x, t.position.y, t.position.z};
             ee::render::Vec3 euler{t.euler.x, t.euler.y, t.euler.z};
             const float scx = t.scale.x, scy = t.scale.y, scz = t.scale.z;
 
             if (_w.hasComponent<SphereComponent>(e))
             {
-                float radius = _w.getComponent<SphereComponent>(e).radius;
+                float radius = _w.getComponent<SphereComponent>(e)->radius;
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), pos,
                             {radius * scx, radius * scy, radius * scz}, euler,
                             ee::render::Color{0.85f, 0.20f, 0.20f});
@@ -49,15 +49,15 @@ namespace ee::scene
 
             if (_w.hasComponent<RectComponent>(e))
             {
-                RectComponent &rc = _w.getComponent<RectComponent>(e);
+                RectComponent &rc = *_w.getComponent<RectComponent>(e);
                 _r.drawMesh(_r.builtin(ee::render::Prim::Cube), pos,
-                            {rc.width * scx, rc.height * scy, rc.depth * scz}, euler,
+                            {rc.size.x * scx, rc.size.y * scy, rc.size.z * scz}, euler,
                             ee::render::Color{0.85f, 0.20f, 0.20f});
             }
 
             if (_w.hasComponent<CapsuleComponent>(e))
             {
-                CapsuleComponent &cc = _w.getComponent<CapsuleComponent>(e);
+                CapsuleComponent &cc = *_w.getComponent<CapsuleComponent>(e);
                 float rr = cc.radius * scx;
                 float hh = cc.height * scy;
                 ee::render::Color capCol{0.20f, 0.55f, 0.85f};
@@ -76,7 +76,7 @@ namespace ee::scene
 
             if (_w.hasComponent<MeshComponent>(e))
             {
-                ee::core::CpuMesh &cm = ee::core::getMesh(_w.getComponent<MeshComponent>(e).path);
+                ee::core::CpuMesh &cm = ee::core::getMesh(_w.getComponent<MeshComponent>(e)->path);
                 if (cm.valid)
                 {
                     if (cm.gpu == 0)
