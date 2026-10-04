@@ -78,17 +78,24 @@ target_link_libraries(ee-core PUBLIC
 # Outil de regeneration du catalogue de composants du PROJET (jamais dans
 # ALL : seul ee-visu le construit explicitement, via "cmake --build --target
 # gen_components", pour relire les vrais champs des composants custom via
-# Reflect<T> et ecrire assets/Components.json).
+# Reflect<T> et ecrire Assets/Components.json).
+#
+# N'existe que si on est embarque dans un VRAI projet etudiant (qui a ce
+# fichier, genere par eliott-hub) -- pas quand ee-core est embarque dans
+# ee-visu lui-meme, qui n'a pas cette structure de dossiers.
 # ---------------------------------------------------------------------------
-add_executable(gen_components EXCLUDE_FROM_ALL
-    tools/gen_components_main.cpp
-    ${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp
-)
-target_include_directories(gen_components PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(gen_components PRIVATE ee-core)
-# Au meme niveau que l'executable du jeu (build/<nom>), pas dans le sous-dossier
-# ou ce CMakeLists est imbrique -> sa deduction de racine projet (<build>/..)
-# reste valide quelle que soit la profondeur d'inclusion.
-set_target_properties(gen_components PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-)
+if(EXISTS "${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp")
+    add_executable(gen_components EXCLUDE_FROM_ALL
+        tools/gen_components_main.cpp
+        ${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp
+    )
+    target_include_directories(gen_components PRIVATE ${CMAKE_SOURCE_DIR})
+    target_link_libraries(gen_components PRIVATE ee-core)
+    # Au meme niveau que l'executable du jeu (build/<nom>), pas dans le
+    # sous-dossier ou ce CMakeLists est imbrique -> sa deduction de racine
+    # projet (<build>/..) reste valide quelle que soit la profondeur
+    # d'inclusion.
+    set_target_properties(gen_components PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endif()
