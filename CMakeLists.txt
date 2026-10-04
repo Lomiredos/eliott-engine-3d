@@ -80,6 +80,15 @@ target_link_libraries(ee-core PUBLIC
 # gen_components", pour relire les vrais champs des composants custom via
 # Reflect<T> et ecrire assets/Components.json).
 # ---------------------------------------------------------------------------
-add_executable(gen_components EXCLUDE_FROM_ALL tools/gen_components_main.cpp)
+add_executable(gen_components EXCLUDE_FROM_ALL
+    tools/gen_components_main.cpp
+    ${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp
+)
 target_include_directories(gen_components PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(gen_components PRIVATE ee-core)
+# Au meme niveau que l'executable du jeu (build/<nom>), pas dans le sous-dossier
+# ou ce CMakeLists est imbrique -> sa deduction de racine projet (<build>/..)
+# reste valide quelle que soit la profondeur d'inclusion.
+set_target_properties(gen_components PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)

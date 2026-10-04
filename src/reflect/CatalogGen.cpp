@@ -68,7 +68,16 @@ namespace ee::reflection
         nlohmann::json root;
         root["components"] = _components;
 
+        std::error_code ec;
+        if (_out.has_parent_path())
+            std::filesystem::create_directories(_out.parent_path(), ec);
+
         std::ofstream f(_out, std::ios::binary);
+        if (!f)
+        {
+            std::cout << "[gen] ecriture impossible : " << _out.string() << "\n";
+            return;
+        }
         f << root.dump(2) << "\n";
 
         std::cout << "[gen] catalogue ecrit : " << _out.string()

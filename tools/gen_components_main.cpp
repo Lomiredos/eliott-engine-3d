@@ -33,6 +33,6 @@ int main()
 {
     nlohmann::json components = nlohmann::json::array();
     buildComponentCatalog(components);
-    ee::reflection::writeCatalog(components, projectRoot() / "assets" / "Components.json");
+    ee::reflection::writeCatalog(components, projectRoot() / "Assets" / "Components.json");
     return 0;
 }
