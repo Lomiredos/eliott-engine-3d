@@ -104,9 +104,9 @@ namespace
     bool rayBox(const ee::systems::Ray &_ray, const Vec3 &_center,
                 const Quat &_rot, const Vec3 &_scale, const ComponentInstance &_shape, float &_outT)
     {
-        float w = valueOf(_shape.values, "width", 0.0f) * _scale.x;
-        float h = valueOf(_shape.values, "height", 0.0f) * _scale.y;
-        float d = valueOf(_shape.values, "depth", 0.0f) * _scale.z;
+        float w = valueOf(_shape.values, "sizeX", 1.0f) * _scale.x;
+        float h = valueOf(_shape.values, "sizeY", 1.0f) * _scale.y;
+        float d = valueOf(_shape.values, "sizeZ", 1.0f) * _scale.z;
 
         // Rotation inverse = conjugue (quaternion unitaire).
         Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
@@ -275,16 +275,16 @@ namespace ee::systems
             if (!tf)
                 continue;
 
-            Vec3 center{valueOf(tf->values, "x", 0.0f),
-                        valueOf(tf->values, "y", 0.0f),
-                        valueOf(tf->values, "z", 0.0f)};
+            Vec3 center{valueOf(tf->values, "PositionX", 0.0f),
+                        valueOf(tf->values, "PositionY", 0.0f),
+                        valueOf(tf->values, "PositionZ", 0.0f)};
 
-            Quat rot = Quat::fromEulerDeg(valueOf(tf->values, "rotX", 0.0f),
-                                          valueOf(tf->values, "rotY", 0.0f),
-                                          valueOf(tf->values, "rotZ", 0.0f));
-            Vec3 scale{valueOf(tf->values, "scaleX", 1.0f),
-                       valueOf(tf->values, "scaleY", 1.0f),
-                       valueOf(tf->values, "scaleZ", 1.0f)};
+            Quat rot = Quat::fromEulerDeg(valueOf(tf->values, "EuleurX", 0.0f),
+                                          valueOf(tf->values, "EuleurY", 0.0f),
+                                          valueOf(tf->values, "EuleurZ", 0.0f));
+            Vec3 scale{valueOf(tf->values, "ScaleX", 1.0f),
+                       valueOf(tf->values, "ScaleY", 1.0f),
+                       valueOf(tf->values, "ScaleZ", 1.0f)};
 
             // Chaque composant reconnu comme une forme est teste via la table.
             for (const auto &ci : ent.components)

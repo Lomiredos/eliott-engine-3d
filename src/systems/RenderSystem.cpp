@@ -62,16 +62,16 @@ namespace ee::systems
             if (!tf)
                 continue;
 
-            ee::render::Vec3 pos{valueOf(tf->values, "x", 0.0f),
-                                 valueOf(tf->values, "y", 0.0f),
-                                 valueOf(tf->values, "z", 0.0f)};
+            ee::render::Vec3 pos{valueOf(tf->values, "PositionX", 0.0f),
+                                 valueOf(tf->values, "PositionY", 0.0f),
+                                 valueOf(tf->values, "PositionZ", 0.0f)};
             // Rotation (degres) + echelle par axe, lues sur le Transform.
-            ee::render::Vec3 euler{valueOf(tf->values, "rotX", 0.0f),
-                                   valueOf(tf->values, "rotY", 0.0f),
-                                   valueOf(tf->values, "rotZ", 0.0f)};
-            float scx = valueOf(tf->values, "scaleX", 1.0f);
-            float scy = valueOf(tf->values, "scaleY", 1.0f);
-            float scz = valueOf(tf->values, "scaleZ", 1.0f);
+            ee::render::Vec3 euler{valueOf(tf->values, "EuleurX", 0.0f),
+                                   valueOf(tf->values, "EuleurY", 0.0f),
+                                   valueOf(tf->values, "EuleurZ", 0.0f)};
+            float scx = valueOf(tf->values, "ScaleX", 1.0f);
+            float scy = valueOf(tf->values, "ScaleY", 1.0f);
+            float scz = valueOf(tf->values, "ScaleZ", 1.0f);
 
             if (sp)
             {
@@ -83,9 +83,9 @@ namespace ee::systems
 
             if (rp)
             {
-                ee::render::Vec3 size{valueOf(rp->values, "width", 0.0f) * scx,
-                                      valueOf(rp->values, "height", 0.0f) * scy,
-                                      valueOf(rp->values, "depth", 0.0f) * scz};
+                ee::render::Vec3 size{valueOf(rp->values, "sizeX", 1.0f) * scx,
+                                      valueOf(rp->values, "sizeY", 1.0f) * scy,
+                                      valueOf(rp->values, "sizeZ", 1.0f) * scz};
                 r.drawMesh(r.builtin(ee::render::Prim::Cube), pos, size, euler,
                            ee::render::Color{0.85f, 0.20f, 0.20f});
             }

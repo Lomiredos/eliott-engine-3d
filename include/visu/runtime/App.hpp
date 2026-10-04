@@ -28,6 +28,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cstdio>
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
@@ -35,11 +36,20 @@
 #include <vector>
 #include <algorithm>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace ee::runtime
 {
     struct Config
     {
-        std::string projectRoot;             // Assets/ScenesDatas/, systems/, base des .obj
+        // Assets/ScenesDatas/, systems/, base des .obj. Laisse vide (defaut) :
+        // deduit automatiquement de l'emplacement de l'executable (convention
+        // <racine>/build/<exe>, celle qu'ecrit eliott-hub) -> marche quel que
+        // soit le dossier courant au lancement (terminal, double-clic, Play
+        // depuis l'editeur qui se place dans le dossier de l'exe...).
+        std::string projectRoot;
         std::string sceneName = "BaseScene";  // Assets/ScenesDatas/<sceneName>.json
         std::string windowTitle = "Game";
         int width = 1000;
@@ -52,6 +62,20 @@ namespace ee::runtime
 
     namespace detail
     {
+        // Racine du projet deduite du chemin de l'executable (convention
+        // <racine>/build/<exe>), independante du dossier courant.
+        inline std::string defaultProjectRoot()
+        {
+#ifdef _WIN32
+            char buffer[MAX_PATH];
+            GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+            std::filesystem::path exe(buffer);
+#else
+            std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe");
+#endif
+            return exe.parent_path().parent_path().string(); // .../build/exe -> ...
+        }
+
         // Table GLFW <-> ee::input::Key, dans le MEME ORDRE que l'enum Key
         // (meme convention que s_keyTable cote SDL dans eliott-input).
         // La taille est deduite du tableau -> jamais de constante a resynchroniser
@@ -182,15 +206,19 @@ namespace ee::runtime
                    const RegisterComponentsFn &_registerComponents,
                    const RegisterSystemsFn &_registerSystems)
     {
+        Config cfg = _cfg;
+        if (cfg.projectRoot.empty())
+            cfg.projectRoot = detail::defaultProjectRoot();
+
         // 1) Scene authoree.
-        std::string scenePath = _cfg.projectRoot + "/Assets/ScenesDatas/" + _cfg.sceneName + ".json";
+        std::string scenePath = cfg.projectRoot + "/Assets/ScenesDatas/" + cfg.sceneName + ".json";
         std::optional<SceneInfo> scene = loadScene(scenePath);
         if (!scene)
         {
             std::fprintf(stderr, "[runtime] scene introuvable : %s\n", scenePath.c_str());
             return 1;
         }
-        ee::core::setMeshBaseDir(_cfg.projectRoot);
+        ee::core::setMeshBaseDir(cfg.projectRoot);
 
         // 2) Composants connus (moteur + jeu).
         ee::scene::WorldRegistry reg;
@@ -202,7 +230,7 @@ namespace ee::runtime
 
         // 3) Systemes AVANT le chargement (le flush les peuple).
         std::vector<SystemInfo> schedule =
-            loadSystemsInDir(_cfg.projectRoot + "/systems");
+            loadSystemsInDir(cfg.projectRoot + "/systems");
         std::vector<SystemInfo> engineSchedule =
             ee::scene::engineSystemInfos();
         schedule.insert(schedule.end(), engineSchedule.begin(), engineSchedule.end());
@@ -231,8 +259,8 @@ namespace ee::runtime
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        GLFWwindow *win = glfwCreateWindow(_cfg.width, _cfg.height,
-                                           _cfg.windowTitle.c_str(), nullptr, nullptr);
+        GLFWwindow *win = glfwCreateWindow(cfg.width, cfg.height,
+                                           cfg.windowTitle.c_str(), nullptr, nullptr);
         if (!win)
         {
             std::fprintf(stderr, "[runtime] creation fenetre a echoue\n");
