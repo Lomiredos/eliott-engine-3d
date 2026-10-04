@@ -73,3 +73,13 @@ target_link_libraries(ee-core PUBLIC
     eliott-ecs
     eliott-input
 )
+
+# ---------------------------------------------------------------------------
+# Outil de regeneration du catalogue de composants du PROJET (jamais dans
+# ALL : seul ee-visu le construit explicitement, via "cmake --build --target
+# gen_components", pour relire les vrais champs des composants custom via
+# Reflect<T> et ecrire assets/Components.json).
+# ---------------------------------------------------------------------------
+add_executable(gen_components EXCLUDE_FROM_ALL tools/gen_components_main.cpp)
+target_include_directories(gen_components PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(gen_components PRIVATE ee-core)
