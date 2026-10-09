@@ -250,6 +250,23 @@ namespace ee::render
                     ix.insert(ix.end(), {a, b, a + 1, a + 1, b, b + 1});
                 }
             m_sphere = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
+
+            // Aretes seules : anneaux de latitude + meridiens, jamais les
+            // diagonales des quads (contrairement a glPolygonMode(GL_LINE)).
+            std::vector<unsigned int> wireIx;
+            for (int i = 0; i <= stacks; ++i)
+                for (int j = 0; j < sectors; ++j)
+                {
+                    unsigned int a = i * (sectors + 1) + j;
+                    wireIx.insert(wireIx.end(), {a, a + 1});
+                }
+            for (int j = 0; j <= sectors; ++j)
+                for (int i = 0; i < stacks; ++i)
+                {
+                    unsigned int a = i * (sectors + 1) + j;
+                    wireIx.insert(wireIx.end(), {a, a + sectors + 1});
+                }
+            attachWireIndices(m_sphere, wireIx.data(), (int)wireIx.size());
         }
 
         // Cube sur [-0.5, 0.5]^3, une normale PAR FACE (faces bien plates).
@@ -279,6 +296,17 @@ namespace ee::render
                 ix.insert(ix.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
             }
             m_cube = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
+
+            // Aretes seules : le perimetre de chaque face, pas la diagonale
+            // qui coupe le quad en 2 triangles.
+            std::vector<unsigned int> wireIx;
+            for (int f = 0; f < 6; ++f)
+            {
+                unsigned int base = f * 4;
+                wireIx.insert(wireIx.end(), {base, base + 1, base + 1, base + 2,
+                                             base + 2, base + 3, base + 3, base});
+            }
+            attachWireIndices(m_cube, wireIx.data(), (int)wireIx.size());
         }
 
         // Cylindre unitaire : rayon 1, hauteur 1 (y de -0.5 a 0.5) + 2 disques.
@@ -326,6 +354,59 @@ namespace ee::render
             addCap(-hh, -1.0f);
 
             m_cylinder = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
+
+            // Aretes seules : les 2 anneaux (haut/bas) + les verticales,
+            // jamais la diagonale qui coupe chaque quad lateral.
+            std::vector<unsigned int> wireIx;
+            for (int j = 0; j < sectors; ++j)
+            {
+                unsigned int a = (unsigned int)j * 2, b = (unsigned int)(j + 1) * 2;
+                wireIx.insert(wireIx.end(), {a, b, a + 1, b + 1, a, a + 1});
+            }
+            attachWireIndices(m_cylinder, wireIx.data(), (int)wireIx.size());
+        }
+
+        // Demi-sphere unitaire, bombee vers +Y (dome) : utilisee pour les
+        // bouts d'une capsule. Meme construction que la sphere complete,
+        // mais phi ne va que de +90 a 0 (reste au-dessus de l'equateur).
+        {
+            const int stacks = 8, sectors = 24;
+            std::vector<float> v;
+            std::vector<unsigned int> ix;
+            for (int i = 0; i <= stacks; ++i)
+            {
+                float phi = PI * 0.5f * (1.0f - (float)i / stacks); // +90 -> 0
+                float y = std::sin(phi), r = std::cos(phi);
+                for (int j = 0; j <= sectors; ++j)
+                {
+                    float theta = 2.0f * PI * (float)j / sectors;
+                    float x = r * std::cos(theta), z = r * std::sin(theta);
+                    v.insert(v.end(), {x, y, z, x, y, z});
+                }
+            }
+            for (int i = 0; i < stacks; ++i)
+                for (int j = 0; j < sectors; ++j)
+                {
+                    unsigned int a = i * (sectors + 1) + j;
+                    unsigned int b = a + sectors + 1;
+                    ix.insert(ix.end(), {a, b, a + 1, a + 1, b, b + 1});
+                }
+            m_hemisphere = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
+
+            std::vector<unsigned int> wireIx;
+            for (int i = 0; i <= stacks; ++i)
+                for (int j = 0; j < sectors; ++j)
+                {
+                    unsigned int a = i * (sectors + 1) + j;
+                    wireIx.insert(wireIx.end(), {a, a + 1});
+                }
+            for (int j = 0; j <= sectors; ++j)
+                for (int i = 0; i < stacks; ++i)
+                {
+                    unsigned int a = i * (sectors + 1) + j;
+                    wireIx.insert(wireIx.end(), {a, a + sectors + 1});
+                }
+            attachWireIndices(m_hemisphere, wireIx.data(), (int)wireIx.size());
         }
 
         m_init = true;
@@ -421,6 +502,20 @@ namespace ee::render
         return (MeshHandle)m_meshes.size(); // handle = index + 1
     }
 
+    void GLRenderer::attachWireIndices(MeshHandle mesh, const unsigned int *idx, int idxCount)
+    {
+        if (mesh == 0 || mesh > m_meshes.size())
+            return;
+        Mesh &m = m_meshes[mesh - 1];
+
+        glBindVertexArray(m.vao);
+        glGenBuffers(1, &m.wireEbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.wireEbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (long long)(idxCount * sizeof(unsigned int)), idx, GL_STATIC_DRAW);
+        glBindVertexArray(0);
+        m.wireIndexCount = idxCount;
+    }
+
     MeshHandle GLRenderer::builtin(Prim which)
     {
         if (!ensureInit())
@@ -433,6 +528,8 @@ namespace ee::render
             return m_cube;
         case Prim::Cylinder:
             return m_cylinder;
+        case Prim::Hemisphere:
+            return m_hemisphere;
         }
         return 0;
     }
@@ -463,11 +560,50 @@ namespace ee::render
         Mat4 mvp = mul(vp, model);
 
         glBindVertexArray(m.vao);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo); // attachWireIndices a pu changer l'EBO du VAO
         glUniform1f(m_uGlow, 0.0f);
         glUniform3f(m_uColor, col.r, col.g, col.b);
         glUniformMatrix4fv(m_uMVP, 1, GL_FALSE, mvp.m);
         glUniformMatrix4fv(m_uModel, 1, GL_FALSE, model.m);
         glDrawElements(GL_TRIANGLES, m.indexCount, GL_UNSIGNED_INT, nullptr);
+    }
+
+    void GLRenderer::drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg, Color col)
+    {
+        if (!m_init || mesh == 0 || mesh > m_meshes.size())
+            return;
+        const Mesh &m = m_meshes[mesh - 1];
+
+        Mat4 vp;
+        for (int i = 0; i < 16; ++i)
+            vp.m[i] = m_vp[i];
+        Mat4 rot = rotationMat(eulerDeg.x, eulerDeg.y, eulerDeg.z);
+        Mat4 model = mul(translate(pos.x, pos.y, pos.z),
+                         mul(rot, scale3(scale.x, scale.y, scale.z)));
+        Mat4 mvp = mul(vp, model);
+
+        glBindVertexArray(m.vao);
+        glUniform1f(m_uGlow, 1.0f); // couleur plate, pas d'ombrage sur des aretes
+        glUniform3f(m_uColor, col.r, col.g, col.b);
+        glUniformMatrix4fv(m_uMVP, 1, GL_FALSE, mvp.m);
+        glUniformMatrix4fv(m_uModel, 1, GL_FALSE, model.m);
+
+        if (m.wireEbo != 0)
+        {
+            // Vrai jeu d'aretes (anneaux/perimetres) : aucune diagonale de
+            // triangulation n'est dessinee.
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.wireEbo);
+            glDrawElements(GL_LINES, m.wireIndexCount, GL_UNSIGNED_INT, nullptr);
+        }
+        else
+        {
+            // Mesh custom (ex. import MeshComponent) sans variante dediee :
+            // repli sur le mode GL_LINE, qui lui dessine les diagonales.
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glDrawElements(GL_TRIANGLES, m.indexCount, GL_UNSIGNED_INT, nullptr);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
     }
 
     void GLRenderer::endScene()

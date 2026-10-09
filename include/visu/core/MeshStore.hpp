@@ -2,29 +2,21 @@
 
 #include "math/Vector3.hpp"
 
+#include <filesystem>
 #include <string>
 #include <vector>
-#include <filesystem>
 
+namespace ee::core {
+struct CpuMesh {
+  std::vector<float> verts;
+  std::vector<unsigned int> idx;
+  ee::math::Vector3<float> aabbMin;
+  ee::math::Vector3<float> aabbMax;
+  unsigned int gpu = 0;
+  bool valid = false;
+};
 
-namespace ee::core
-{
-    struct CpuMesh
-    {
-        std::vector<float> verts;       // interleaved x,y,z, nx,ny,nz
-        std::vector<unsigned int> idx;  // indices (triangles)
-        ee::math::Vector3<float> aabbMin;
-        ee::math::Vector3<float> aabbMax;
-        unsigned int gpu = 0; // handle renderer, 0 = pas encore envoye au GPU
-        bool valid = false;   // false si le .obj est introuvable / vide / casse
-    };
+void setMeshBaseDir(const std::filesystem::path &_dir);
 
-    // Dossier de base (racine du projet/jeu) pour resoudre les chemins .obj
-    // RELATIFS. Les chemins absolus l'ignorent. A appeler a l'ouverture du projet.
-    void setMeshBaseDir(const std::filesystem::path &_dir);
-
-    // Renvoie le mesh pour ce chemin (charge + cache au 1er appel). Un chemin
-    // relatif part du dossier de base ci-dessus. Toujours renvoyee : un .obj
-    // introuvable donne un CpuMesh 'valid == false'.
-    CpuMesh &getMesh(const std::string &_path);
-}
+CpuMesh &getMesh(const std::string &_path);
+} // namespace ee::core

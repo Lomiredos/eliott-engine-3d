@@ -54,7 +54,6 @@ add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
     src/reflect/CatalogGen.cpp
     src/reflect/SceneBind.cpp
-    src/runtime/RuntimeSmokeTest.cpp
 )
 
 target_include_directories(ee-core PUBLIC
