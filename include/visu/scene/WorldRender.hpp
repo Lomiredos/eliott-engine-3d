@@ -22,6 +22,7 @@
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/CameraComponent.hpp"
 #include "visu/systems/RenderSystem.hpp" // drawColliderWire
+#include "visu/scene/Hierarchy.hpp"
 
 #include "math/Quaternion.hpp"
 
@@ -41,10 +42,10 @@ namespace ee::scene
             if (!_w.hasComponent<TransformComponent>(e))
                 continue;
 
-            TransformComponent &t = *_w.getComponent<TransformComponent>(e);
-            ee::render::Vec3 pos{t.position.x, t.position.y, t.position.z};
-            ee::render::Vec3 euler{t.euler.x, t.euler.y, t.euler.z};
-            const float scx = t.scale.x, scy = t.scale.y, scz = t.scale.z;
+            const Xform wx = worldXform(_w, e); // monde (parent resolu)
+            ee::render::Vec3 pos{wx.pos.x, wx.pos.y, wx.pos.z};
+            ee::render::Vec3 euler{wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z};
+            const float scx = wx.scale.x, scy = wx.scale.y, scz = wx.scale.z;
 
             if (_w.hasComponent<SphereComponent>(e))
             {
@@ -122,9 +123,9 @@ namespace ee::scene
             if (!_w.hasComponent<CameraComponent>(e) || !_w.hasComponent<TransformComponent>(e))
                 continue;
             const CameraComponent &c = *_w.getComponent<CameraComponent>(e);
-            const TransformComponent &t = *_w.getComponent<TransformComponent>(e);
+            const Xform wx = worldXform(_w, e);
             ee::render::Camera cam = ee::systems::cameraFromTransform(
-                {t.position.x, t.position.y, t.position.z}, {t.euler.x, t.euler.y, t.euler.z},
+                {wx.pos.x, wx.pos.y, wx.pos.z}, {wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z},
                 c.fov, c.nearZ, c.farZ);
             if (c.isMain)
                 active.push_back(cam);

@@ -2,6 +2,7 @@
 
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
+#include "visu/scene/Hierarchy.hpp"
 
 #include "math/Quaternion.hpp"
 
@@ -56,6 +57,8 @@ ee::render::Vec3 quatToEulerDeg(const ee::math::Quaternion &q) {
 namespace ee::systems {
 void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
                  int selected, bool editorOverlays) {
+  // Transforms monde (hierarchie parent/enfant resolue).
+  const std::vector<ee::scene::Xform> world = ee::scene::sceneWorldXforms(scene);
   for (std::size_t idx = 0; idx < scene.entities.size(); ++idx) {
     const EntityInfo &ent = scene.entities[idx];
     const ComponentInstance *tf = nullptr;
@@ -84,16 +87,12 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     if (!tf)
       continue;
 
-    ee::render::Vec3 pos{valueOf(tf->values, "PositionX", 0.0f),
-                         valueOf(tf->values, "PositionY", 0.0f),
-                         valueOf(tf->values, "PositionZ", 0.0f)};
-
-    ee::render::Vec3 euler{valueOf(tf->values, "EuleurX", 0.0f),
-                           valueOf(tf->values, "EuleurY", 0.0f),
-                           valueOf(tf->values, "EuleurZ", 0.0f)};
-    float scx = valueOf(tf->values, "ScaleX", 1.0f);
-    float scy = valueOf(tf->values, "ScaleY", 1.0f);
-    float scz = valueOf(tf->values, "ScaleZ", 1.0f);
+    const ee::scene::Xform &wx = world[idx];
+    ee::render::Vec3 pos{wx.pos.x, wx.pos.y, wx.pos.z};
+    ee::render::Vec3 euler{wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z};
+    float scx = wx.scale.x;
+    float scy = wx.scale.y;
+    float scz = wx.scale.z;
 
     if (sp) {
       float radius = valueOf(sp->values, "radius", 1.0f);
@@ -265,14 +264,13 @@ bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out) {
   }
   if (!tf || !cam)
     return false;
-  out = cameraFromTransform(
-      {valueOf(tf->values, "PositionX", 0.0f),
-       valueOf(tf->values, "PositionY", 0.0f),
-       valueOf(tf->values, "PositionZ", 0.0f)},
-      {valueOf(tf->values, "EuleurX", 0.0f), valueOf(tf->values, "EuleurY", 0.0f),
-       valueOf(tf->values, "EuleurZ", 0.0f)},
-      valueOf(cam->values, "fov", 45.0f), valueOf(cam->values, "nearZ", 0.1f),
-      valueOf(cam->values, "farZ", 200.0f));
+  // Position/rotation MONDE (une camera peut etre l'enfant d'une entite).
+  ee::scene::Xform wx = ee::scene::sceneWorldXforms(scene)[index];
+  out = cameraFromTransform({wx.pos.x, wx.pos.y, wx.pos.z},
+                            {wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z},
+                            valueOf(cam->values, "fov", 45.0f),
+                            valueOf(cam->values, "nearZ", 0.1f),
+                            valueOf(cam->values, "farZ", 200.0f));
   return true;
 }
 

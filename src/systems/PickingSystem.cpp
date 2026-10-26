@@ -1,4 +1,5 @@
 #include "visu/systems/PickingSystem.hpp"
+#include "visu/scene/Hierarchy.hpp"
 
 #include "visu/core/MeshStore.hpp"
 #include "math/Quaternion.hpp"
@@ -279,6 +280,7 @@ namespace ee::systems
     {
         int best = -1;
         float bestT = 1e30f; // "l'infini" : toute vraie distance sera plus petite
+        const std::vector<ee::scene::Xform> world = ee::scene::sceneWorldXforms(_scene);
 
         for (int idx = 0; idx < static_cast<int>(_scene.entities.size()); ++idx)
         {
@@ -292,16 +294,11 @@ namespace ee::systems
             if (!tf)
                 continue;
 
-            Vec3 center{valueOf(tf->values, "PositionX", 0.0f),
-                        valueOf(tf->values, "PositionY", 0.0f),
-                        valueOf(tf->values, "PositionZ", 0.0f)};
-
-            Quat rot = Quat::fromEulerDeg(valueOf(tf->values, "EuleurX", 0.0f),
-                                          valueOf(tf->values, "EuleurY", 0.0f),
-                                          valueOf(tf->values, "EuleurZ", 0.0f));
-            Vec3 scale{valueOf(tf->values, "ScaleX", 1.0f),
-                       valueOf(tf->values, "ScaleY", 1.0f),
-                       valueOf(tf->values, "ScaleZ", 1.0f)};
+            // Transform MONDE (hierarchie parent/enfant resolue).
+            const ee::scene::Xform &wx = world[idx];
+            Vec3 center = wx.pos;
+            Quat rot = wx.rot;
+            Vec3 scale = wx.scale;
 
             // Chaque composant reconnu comme une forme est teste via la table.
             for (const auto &ci : ent.components)

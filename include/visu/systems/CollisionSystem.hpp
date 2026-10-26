@@ -11,6 +11,7 @@
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/RigideBodyComponent.hpp"
 #include "visu/components/TransformComponent.hpp"
+#include "visu/scene/Hierarchy.hpp"
 
 struct Contact {
   bool hit = false;
@@ -150,15 +151,15 @@ struct WorldCollider {
   float radius = 0.0f;           // Sphere
 };
 
-inline WorldCollider toWorld(const TransformComponent &_tf,
+// _tf = transform MONDE de l'entite (parent resolu, voir worldXform).
+inline WorldCollider toWorld(const ee::scene::Xform &_tf,
                              const ColliderComponent &_cc) {
   WorldCollider w;
   w.shape = _cc.shape;
-  ee::math::Quaternion qTf =
-      ee::math::Quaternion::fromEulerDeg(_tf.euler.x, _tf.euler.y, _tf.euler.z);
+  const ee::math::Quaternion &qTf = _tf.rot;
   w.rot = qTf * ee::math::Quaternion::fromEulerDeg(_cc.euler.x, _cc.euler.y,
                                                    _cc.euler.z);
-  w.center = _tf.position + qTf.rotate(_cc.offset * _tf.scale);
+  w.center = _tf.pos + qTf.rotate(_cc.offset * _tf.scale);
   w.half = _cc.halfExtents * _tf.scale;
   // Une sphere mise a l'echelle de facon non uniforme est un ellipsoide :
   // on prend le plus grand axe (la sphere englobante).
@@ -198,7 +199,6 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
     ee::ecs::EntityID idA = ents[i];
 
     ColliderComponent &cc = *_world.getComponent<ColliderComponent>(idA);
-    TransformComponent &tf = *_world.getComponent<TransformComponent>(idA);
 
     if (!cc.isActive)
       continue;
@@ -211,13 +211,14 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       ee::ecs::EntityID idB = ents[j];
 
       ColliderComponent &occ = *_world.getComponent<ColliderComponent>(idB);
-      TransformComponent &otf = *_world.getComponent<TransformComponent>(idB);
 
       if (!occ.isActive)
         continue;
 
       // Recalcule a chaque paire : une resolution precedente a pu bouger A.
-      Contact info = collide(toWorld(tf, cc), toWorld(otf, occ));
+      // Transforms monde : un collider peut etre porte par un enfant.
+      Contact info = collide(toWorld(ee::scene::worldXform(_world, idA), cc),
+                             toWorld(ee::scene::worldXform(_world, idB), occ));
       if (!info.hit)
         continue;
 
@@ -239,8 +240,11 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       wA /= sum;
       wB /= sum;
 
-      tf.position -= info.normal * (info.depth * wA);
-      otf.position += info.normal * (info.depth * wB);
+      // Correction exprimee dans le monde, convertie dans le repere du parent.
+      if (wA > 0.0f)
+        ee::scene::moveWorld(_world, idA, -(info.normal * (info.depth * wA)));
+      if (wB > 0.0f)
+        ee::scene::moveWorld(_world, idB, info.normal * (info.depth * wB));
 
       if (dynA) {
         float vn = rbA->velocity.Dot(info.normal);
