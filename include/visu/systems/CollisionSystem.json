@@ -1,0 +1,9 @@
+{
+  "category": "engine",
+  "components": [
+    "TransformComponent",
+    "ColliderComponent"
+  ],
+  "name": "CollisionSystem",
+  "priority": 200
+}

@@ -16,4 +16,7 @@ struct SystemInfo
 
 std::optional<SystemInfo> loadSystemInfo(const std::filesystem::path &jsonPath);
 
+// Meme lecture, depuis le texte JSON (ex. sidecars moteur embarques au build).
+std::optional<SystemInfo> parseSystemInfo(const std::string &json);
+
 std::vector<SystemInfo> loadSystemsInDir(const std::filesystem::path &dir);

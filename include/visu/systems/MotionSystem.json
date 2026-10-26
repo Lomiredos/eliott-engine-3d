@@ -1,0 +1,9 @@
+{
+  "category": "engine",
+  "components": [
+    "TransformComponent",
+    "RigideBodyComponent"
+  ],
+  "name": "MotionSystem",
+  "priority": 100
+}

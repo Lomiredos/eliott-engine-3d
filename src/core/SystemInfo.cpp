@@ -5,6 +5,20 @@
 #include <algorithm>
 #include <fstream>
 
+namespace
+{
+    std::optional<SystemInfo> fromJson(const nlohmann::json &j)
+    {
+        SystemInfo info;
+        info.name = j.value("name", "");
+        info.priority = j.value("priority", 0);
+        info.category = j.value("category", "");
+        if (j.contains("components"))
+            info.components = j["components"].get<std::vector<std::string>>();
+        return info;
+    }
+}
+
 std::optional<SystemInfo> loadSystemInfo(const std::filesystem::path &jsonPath)
 {
     std::ifstream f(jsonPath);
@@ -13,16 +27,19 @@ std::optional<SystemInfo> loadSystemInfo(const std::filesystem::path &jsonPath)
 
     try
     {
-        nlohmann::json j = nlohmann::json::parse(f);
+        return fromJson(nlohmann::json::parse(f));
+    }
+    catch (const std::exception &)
+    {
+        return std::nullopt; // JSON malforme
+    }
+}
 
-        SystemInfo info;
-        info.name = j.value("name", "");
-        info.priority = j.value("priority", 0);
-        info.category = j.value("category", "");
-        if (j.contains("components"))
-            info.components = j["components"].get<std::vector<std::string>>();
-
-        return info;
+std::optional<SystemInfo> parseSystemInfo(const std::string &json)
+{
+    try
+    {
+        return fromJson(nlohmann::json::parse(json));
     }
     catch (const std::exception &)
     {

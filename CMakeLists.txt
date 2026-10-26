@@ -61,7 +61,32 @@ target_include_directories(ee-core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
 )
 
+# ---------------------------------------------------------------------------
+# Sidecars des systemes moteur (include/visu/systems/<Nom>.json) : embarques
+# dans un header genere, lu par engineSystemInfos(). Les .json restent la
+# seule source de verite (signature, priorite), comme pour les systemes du
+# projet ; modifier ou ajouter un .json relance la configuration.
+# ---------------------------------------------------------------------------
+file(GLOB EE_ENGINE_SYSTEM_JSONS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/visu/systems/*.json")
+set(EE_ENGINE_SYSTEM_ENTRIES "")
+foreach(json_file IN LISTS EE_ENGINE_SYSTEM_JSONS)
+    file(READ "${json_file}" json_text)
+    string(APPEND EE_ENGINE_SYSTEM_ENTRIES "    R\"EESYS(${json_text})EESYS\",\n")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${json_file}")
+endforeach()
+file(CONFIGURE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/visu/scene/EngineSystemsData.hpp"
+    CONTENT "#pragma once\n\n// Genere par CMake depuis include/visu/systems/*.json -- ne pas editer.\nnamespace ee::scene\n{\n    inline constexpr const char *kEngineSystemJsons[] = {\n${EE_ENGINE_SYSTEM_ENTRIES}    nullptr};\n}\n"
+    @ONLY)
+target_include_directories(ee-core PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
 add_subdirectory(extern/eliott-ecs)
+# SDL ne sert qu'aux manettes (la fenetre et le clavier passent par GLFW) :
+# sans son module video, SDL statique n'embarque pas son propre code Wayland,
+# qui entre en conflit au link avec celui de GLFW.
+set(SDL_VIDEO OFF CACHE BOOL "" FORCE)
+set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE) # sinon SDL refuse de configurer sans X11/Wayland
 add_subdirectory(extern/eliott-input)
 
 target_link_libraries(ee-core PUBLIC

@@ -1,0 +1,8 @@
+{
+  "category": "engine",
+  "components": [
+    "RigideBodyComponent"
+  ],
+  "name": "GravitySystem",
+  "priority": 0
+}
