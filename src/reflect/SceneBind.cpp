@@ -83,4 +83,37 @@ namespace ee::reflection
             }
         }
     }
+
+    void SaveVisitor::visit(const char *_name, int &_value) { m_comp.values[_name] = _value; }
+
+    void SaveVisitor::visit(const char *_name, bool &_value) { m_comp.values[_name] = _value; }
+
+    void SaveVisitor::visit(const char *_name, float &_value) { m_comp.values[_name] = _value; }
+
+    void SaveVisitor::visit(const char *_name, std::string &_value) { m_comp.values[_name] = _value; }
+
+    void SaveVisitor::visit(const char *_name, ee::math::Vector3<float> &_value)
+    {
+        std::string s(_name);
+        m_comp.values[s + "X"] = _value.x;
+        m_comp.values[s + "Y"] = _value.y;
+        m_comp.values[s + "Z"] = _value.z;
+    }
+
+    void SaveVisitor::visit(const char *_name, ee::math::Quaternion &_value)
+    {
+        std::string s(_name);
+        m_comp.values[s + "W"] = _value.w;
+        m_comp.values[s + "X"] = _value.x;
+        m_comp.values[s + "Y"] = _value.y;
+        m_comp.values[s + "Z"] = _value.z;
+    }
+
+    void SaveVisitor::visitEnum(const char *_name, int &_value, const char *const *_labels, int _count)
+    {
+        if (_value >= 0 && _value < _count)
+            m_comp.values[_name] = std::string(_labels[_value]);
+        else
+            m_comp.values[_name] = _value;
+    }
 }
