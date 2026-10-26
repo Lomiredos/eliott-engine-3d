@@ -230,7 +230,7 @@ namespace ee::runtime
 
         // 3) Systemes AVANT le chargement (le flush les peuple).
         std::vector<SystemInfo> schedule =
-            loadSystemsInDir(cfg.projectRoot + "/systems");
+            loadSystemsInDir(cfg.projectRoot + "/Systems");
         std::vector<SystemInfo> engineSchedule =
             ee::scene::engineSystemInfos();
         schedule.insert(schedule.end(), engineSchedule.begin(), engineSchedule.end());
