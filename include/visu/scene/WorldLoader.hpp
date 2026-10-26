@@ -20,34 +20,38 @@ namespace ee::scene
     class WorldRegistry
     {
     public:
+        // _ents (add/save/patch) = EntityID de chaque entite de la scene, par
+        // index : convertit les EntityRef (index dans la scene <-> EntityID).
+        using Entities = std::vector<ee::ecs::EntityID>;
+
         struct Entry
         {
-            std::function<void(ee::ecs::World &, ee::ecs::EntityID, const ComponentInstance &)> add;
+            std::function<void(ee::ecs::World &, ee::ecs::EntityID, const ComponentInstance &, const Entities &)> add;
             std::function<size_t()> componentId;
             // Pour le lien avec l'editeur (inspecteur en direct) :
             std::function<bool(ee::ecs::World &, ee::ecs::EntityID)> has;
-            std::function<ComponentInstance(ee::ecs::World &, ee::ecs::EntityID)> save;
-            std::function<void(ee::ecs::World &, ee::ecs::EntityID, const ComponentInstance &)> patch;
+            std::function<ComponentInstance(ee::ecs::World &, ee::ecs::EntityID, const Entities &)> save;
+            std::function<void(ee::ecs::World &, ee::ecs::EntityID, const ComponentInstance &, const Entities &)> patch;
         };
 
         template <typename T>
         void reg()
         {
             Entry e;
-            e.add = [](ee::ecs::World &_w, ee::ecs::EntityID _id, const ComponentInstance &_ci)
+            e.add = [](ee::ecs::World &_w, ee::ecs::EntityID _id, const ComponentInstance &_ci, const Entities &_ents)
             {
-                _w.addComponent<T>(_id, ee::reflection::loadFromInstance<T>(_ci));
+                _w.addComponent<T>(_id, ee::reflection::loadFromInstance<T>(_ci, &_ents));
             };
             e.componentId = []()
             { return ee::ecs::getComponentID<T>(); };
             e.has = [](ee::ecs::World &_w, ee::ecs::EntityID _id)
             { return _w.hasComponent<T>(_id); };
-            e.save = [](ee::ecs::World &_w, ee::ecs::EntityID _id)
-            { return ee::reflection::saveToInstance<T>(*_w.getComponent<T>(_id)); };
-            e.patch = [](ee::ecs::World &_w, ee::ecs::EntityID _id, const ComponentInstance &_ci)
+            e.save = [](ee::ecs::World &_w, ee::ecs::EntityID _id, const Entities &_ents)
+            { return ee::reflection::saveToInstance<T>(*_w.getComponent<T>(_id), &_ents); };
+            e.patch = [](ee::ecs::World &_w, ee::ecs::EntityID _id, const ComponentInstance &_ci, const Entities &_ents)
             {
                 if (_w.hasComponent<T>(_id))
-                    ee::reflection::patchFromInstance<T>(*_w.getComponent<T>(_id), _ci);
+                    ee::reflection::patchFromInstance<T>(*_w.getComponent<T>(_id), _ci, &_ents);
             };
 
             std::string name = ee::reflection::Reflect<T>::name;
@@ -95,15 +99,15 @@ namespace ee::scene
                                                              const SceneInfo &_scene,
                                                              const WorldRegistry &_reg)
     {
+        // Toutes les entites d'abord : une EntityRef peut viser une entite
+        // plus loin dans la scene.
         std::vector<ee::ecs::EntityID> created;
-        for (const EntityInfo &ent : _scene.entities)
-        {
-            ee::ecs::EntityID id = _world.createEntity();
-            created.push_back(id);
-            for (const ComponentInstance &ci : ent.components)
+        for (size_t i = 0; i < _scene.entities.size(); ++i)
+            created.push_back(_world.createEntity());
+        for (size_t i = 0; i < _scene.entities.size(); ++i)
+            for (const ComponentInstance &ci : _scene.entities[i].components)
                 if (const WorldRegistry::Entry *e = _reg.find(ci.name))
-                    e->add(_world, id, ci);
-        }
+                    e->add(_world, created[i], ci, created);
         _world.flush(); // active les entites -> peuple les listes des systemes
         return created;
     }
@@ -137,7 +141,7 @@ namespace ee::scene
             for (const std::string &n : order)
                 if (const WorldRegistry::Entry *e = _reg.find(n))
                     if (e->has(_world, id))
-                        ent.components.push_back(e->save(_world, id));
+                        ent.components.push_back(e->save(_world, id, _ents));
             out.entities.push_back(std::move(ent));
         }
         return out;

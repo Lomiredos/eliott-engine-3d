@@ -63,6 +63,16 @@ namespace ee::reflection
         fields.push_back(f);
     }
 
+    // "entity" : index d'entite dans la scene (-1 = aucune) ; "requires" =
+    // composant que l'entite doit avoir pour etre acceptee par l'editeur.
+    void CatalogVisitor::visitEntity(const char *_name, ee::EntityRef &, const char *_required)
+    {
+        nlohmann::json f = makeField(_name, "entity", -1);
+        if (_required)
+            f["requires"] = _required;
+        fields.push_back(f);
+    }
+
     void writeCatalog(const nlohmann::json &_components, const std::filesystem::path &_out)
     {
         nlohmann::json root;

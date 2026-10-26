@@ -214,7 +214,7 @@ namespace ee::runtime
                 ComponentInstance patch;
                 patch.name = _m.value("c", "");
                 patch.values[_m.value("f", "")] = *v;
-                entry->patch(_game.world(), _game.entities()[e], patch);
+                entry->patch(_game.world(), _game.entities()[e], patch, _game.entities());
             }
 
             ee::ipc::Socket m_sock;

@@ -84,6 +84,29 @@ namespace ee::reflection
         }
     }
 
+    // Scene : index de l'entite (-1 = aucune) -> EntityID via la table.
+    void LoadVisitor::visitEntity(const char *_name, ee::EntityRef &_value, const char *)
+    {
+        auto it = m_comp.values.find(_name);
+        if (it == m_comp.values.end())
+            return;
+        int index = -1;
+        if (auto p = std::get_if<int>(&it->second))
+            index = *p;
+        else if (auto p = std::get_if<float>(&it->second))
+            index = static_cast<int>(*p);
+        else
+            return;
+
+        if (index < 0)
+            _value.id = ee::EntityRef::kNone;
+        else if (!m_entities)
+            _value.id = static_cast<uint32_t>(index);
+        else
+            _value.id = index < static_cast<int>(m_entities->size()) ? (*m_entities)[index]
+                                                                    : ee::EntityRef::kNone;
+    }
+
     void SaveVisitor::visit(const char *_name, int &_value) { m_comp.values[_name] = _value; }
 
     void SaveVisitor::visit(const char *_name, bool &_value) { m_comp.values[_name] = _value; }
@@ -115,5 +138,24 @@ namespace ee::reflection
             m_comp.values[_name] = std::string(_labels[_value]);
         else
             m_comp.values[_name] = _value;
+    }
+
+    // EntityID -> index dans la scene ; -1 si aucune ou entite creee en jeu.
+    void SaveVisitor::visitEntity(const char *_name, ee::EntityRef &_value, const char *)
+    {
+        int index = -1;
+        if (_value.valid())
+        {
+            if (!m_entities)
+                index = static_cast<int>(_value.id);
+            else
+                for (size_t i = 0; i < m_entities->size(); ++i)
+                    if ((*m_entities)[i] == _value.id)
+                    {
+                        index = static_cast<int>(i);
+                        break;
+                    }
+        }
+        m_comp.values[_name] = index;
     }
 }

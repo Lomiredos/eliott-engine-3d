@@ -3,6 +3,9 @@
 #include "math/Vector3.hpp"
 #include "math/Quaternion.hpp"
 
+#include "visu/core/EntityRef.hpp"
+#include "visu/reflect/Reflect.hpp"
+
 #include <string>
 
 template <typename E>
@@ -22,6 +25,16 @@ namespace ee::reflection
         virtual void visit(const char *_name, ee::math::Vector3<float> &_value) = 0;
         virtual void visit(const char *_name, ee::math::Quaternion &_value) = 0;
         virtual void visitEnum(const char *_name, int &_value, const char *const *_labels, int _count) = 0;
+        // _required = nom du composant que l'entite visee doit avoir (nullptr = aucun).
+        virtual void visitEntity(const char *_name, ee::EntityRef &_value, const char *_required) = 0;
+
+        void visit(const char *_name, ee::EntityRef &_value) { visitEntity(_name, _value, nullptr); }
+
+        template <typename C>
+        void visit(const char *_name, ee::EntityRefOf<C> &_value)
+        {
+            visitEntity(_name, _value, Reflect<C>::name);
+        }
 
         template <typename E>
         void visit(const char *_name, E &_value)
