@@ -83,12 +83,115 @@ inline Contact SphereToBox(const ee::math::Vector3<float> &_sphereCenter,
   return {true, _boxRot.rotate(nLocal), depth};
 }
 
+// Box/box entre deux boites orientees (OBB) : test des axes separateurs
+// (3 axes de A, 3 de B, 9 produits croises). Le contact garde l'axe de plus
+// faible penetration ; la normale va de A vers B, comme les autres tests.
+inline Contact BoxToBox(const ee::math::Vector3<float> &_centerA,
+                        const ee::math::Vector3<float> &_halfA,
+                        const ee::math::Quaternion &_rotA,
+                        const ee::math::Vector3<float> &_centerB,
+                        const ee::math::Vector3<float> &_halfB,
+                        const ee::math::Quaternion &_rotB) {
+  const ee::math::Vector3<float> axA[3] = {_rotA.right(), _rotA.up(),
+                                           _rotA.back()};
+  const ee::math::Vector3<float> axB[3] = {_rotB.right(), _rotB.up(),
+                                           _rotB.back()};
+  const float hA[3] = {_halfA.x, _halfA.y, _halfA.z};
+  const float hB[3] = {_halfB.x, _halfB.y, _halfB.z};
+  ee::math::Vector3<float> d = _centerB - _centerA;
+
+  Contact best;
+  best.depth = 1e30f;
+
+  // Renvoie false si l'axe separe les deux boites (pas de contact).
+  auto testAxis = [&](ee::math::Vector3<float> _axis) {
+    float len2 = _axis.Dot(_axis);
+    if (len2 < 1e-8f)
+      return true; // produit croise d'axes paralleles : axe inutilisable
+    _axis = _axis / std::sqrt(len2);
+
+    float rA = 0.0f, rB = 0.0f;
+    for (int k = 0; k < 3; ++k) {
+      rA += hA[k] * std::fabs(axA[k].Dot(_axis));
+      rB += hB[k] * std::fabs(axB[k].Dot(_axis));
+    }
+    float dist = d.Dot(_axis);
+    float overlap = rA + rB - std::fabs(dist);
+    if (overlap <= 0.0f)
+      return false;
+    if (overlap < best.depth) {
+      best.depth = overlap;
+      best.normal = dist < 0.0f ? -_axis : _axis;
+    }
+    return true;
+  };
+
+  for (int k = 0; k < 3; ++k)
+    if (!testAxis(axA[k]) || !testAxis(axB[k]))
+      return {};
+  for (int a = 0; a < 3; ++a)
+    for (int b = 0; b < 3; ++b)
+      if (!testAxis(axA[a].Cross(axB[b])))
+        return {};
+
+  best.hit = true;
+  return best;
+}
+
+// Collider d'une entite exprime dans le monde : meme calcul que le rendu
+// wire (RenderSystem), pour que la physique colle a ce qu'on voit. L'offset
+// est mis a l'echelle puis tourne par le transform ; la rotation du collider
+// se compose apres celle du transform ; les dimensions suivent l'echelle.
+struct WorldCollider {
+  ColliderShape shape = ColliderShape::Sphere;
+  ee::math::Vector3<float> center;
+  ee::math::Quaternion rot;
+  ee::math::Vector3<float> half; // Box
+  float radius = 0.0f;           // Sphere
+};
+
+inline WorldCollider toWorld(const TransformComponent &_tf,
+                             const ColliderComponent &_cc) {
+  WorldCollider w;
+  w.shape = _cc.shape;
+  ee::math::Quaternion qTf =
+      ee::math::Quaternion::fromEulerDeg(_tf.euler.x, _tf.euler.y, _tf.euler.z);
+  w.rot = qTf * ee::math::Quaternion::fromEulerDeg(_cc.euler.x, _cc.euler.y,
+                                                   _cc.euler.z);
+  w.center = _tf.position + qTf.rotate(_cc.offset * _tf.scale);
+  w.half = _cc.halfExtents * _tf.scale;
+  // Une sphere mise a l'echelle de facon non uniforme est un ellipsoide :
+  // on prend le plus grand axe (la sphere englobante).
+  float s = std::fmax(std::fabs(_tf.scale.x),
+                      std::fmax(std::fabs(_tf.scale.y), std::fabs(_tf.scale.z)));
+  w.radius = _cc.radius * s;
+  return w;
+}
+
+inline Contact collide(const WorldCollider &_a, const WorldCollider &_b) {
+  using S = ColliderShape;
+  if (_a.shape == S::Sphere && _b.shape == S::Sphere)
+    return SphereToSphere(_a.center, _b.center, _a.radius, _b.radius);
+  if (_a.shape == S::Sphere && _b.shape == S::Box)
+    return SphereToBox(_a.center, _a.radius, _b.center, _b.half, _b.rot);
+  if (_a.shape == S::Box && _b.shape == S::Sphere) {
+    Contact c = SphereToBox(_b.center, _b.radius, _a.center, _a.half, _a.rot);
+    c.normal = -c.normal;
+    return c;
+  }
+  if (_a.shape == S::Box && _b.shape == S::Box)
+    return BoxToBox(_a.center, _a.half, _a.rot, _b.center, _b.half, _b.rot);
+  // ##TODO : capsule
+  return {};
+}
+
 class CollisionSystem : public ee::ecs::UpdateSystem {
 public:
   void update(ee::ecs::World &_world, float _dt) override;
 };
 
 inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
+  (void)_dt;
   std::vector<ee::ecs::EntityID> ents(m_entities.begin(), m_entities.end());
 
   for (size_t i = 0; i < ents.size(); ++i) {
@@ -113,31 +216,8 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       if (!occ.isActive)
         continue;
 
-      Contact info;
-      if (cc.shape == ColliderShape::Sphere &&
-          occ.shape == ColliderShape::Sphere)
-        info = SphereToSphere(tf.position + cc.offset,
-                              otf.position + occ.offset, cc.radius, occ.radius);
-      else if (cc.shape == ColliderShape::Sphere &&
-               occ.shape == ColliderShape::Box) {
-        ee::math::Quaternion qB = ee::math::Quaternion::fromEulerDeg(
-                                      otf.euler.x, otf.euler.y, otf.euler.z) *
-                                  ee::math::Quaternion::fromEulerDeg(
-                                      occ.euler.x, occ.euler.y, occ.euler.z);
-        info = SphereToBox(tf.position + cc.offset, cc.radius,
-                           otf.position + occ.offset, occ.halfExtents, qB);
-      } else if (cc.shape == ColliderShape::Box &&
-                 occ.shape == ColliderShape::Sphere) {
-        ee::math::Quaternion qA = ee::math::Quaternion::fromEulerDeg(
-                                      tf.euler.x, tf.euler.y, tf.euler.z) *
-                                  ee::math::Quaternion::fromEulerDeg(
-                                      cc.euler.x, cc.euler.y, cc.euler.z);
-        info = SphereToBox(otf.position + occ.offset, occ.radius,
-                           tf.position + cc.offset, cc.halfExtents, qA);
-        info.normal = -info.normal;
-      }
-      // ##TODO : box/box, capsule...
-
+      // Recalcule a chaque paire : une resolution precedente a pu bouger A.
+      Contact info = collide(toWorld(tf, cc), toWorld(otf, occ));
       if (!info.hit)
         continue;
 
@@ -148,8 +228,11 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       // ##TODO trigger : si cc.isTrigger || occ.isTrigger -> emettre un
       //        TriggerEvent et NE PAS resoudre (ni position, ni vitesse).
 
-      float wA = rbA ? 1.0f : 0.0f;
-      float wB = rbB ? 1.0f : 0.0f;
+      // Un corps statique se comporte comme un decor : il ne bouge pas.
+      bool dynA = rbA && !rbA->isStatic;
+      bool dynB = rbB && !rbB->isStatic;
+      float wA = dynA ? 1.0f : 0.0f;
+      float wB = dynB ? 1.0f : 0.0f;
       float sum = wA + wB;
       if (sum == 0.0f)
         continue;
@@ -159,12 +242,12 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       tf.position -= info.normal * (info.depth * wA);
       otf.position += info.normal * (info.depth * wB);
 
-      if (rbA) {
+      if (dynA) {
         float vn = rbA->velocity.Dot(info.normal);
         if (vn > 0.0f)
           rbA->velocity -= info.normal * vn;
       }
-      if (rbB) {
+      if (dynB) {
         float vn = rbB->velocity.Dot(info.normal);
         if (vn < 0.0f)
           rbB->velocity -= info.normal * vn;

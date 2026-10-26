@@ -17,6 +17,8 @@ inline void GravitySystem::update(ee::ecs::World& _world, float _dt) {
 
     for (ee::ecs::EntityID e : m_entities){
         RigideBodyComponent& rb = *_world.getComponent<RigideBodyComponent>(e);
+        if (rb.isStatic)
+            continue;
 
         rb.velocity.y += g * _dt;
     }

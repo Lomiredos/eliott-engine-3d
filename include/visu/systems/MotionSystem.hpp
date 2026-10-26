@@ -15,6 +15,8 @@ class MotionSystem : public ee::ecs::UpdateSystem {
 inline void MotionSystem::update(ee::ecs::World& _world, float _dt) {
     for (ee::ecs::EntityID e : m_entities){
         RigideBodyComponent& rb = *_world.getComponent<RigideBodyComponent>(e);
+        if (rb.isStatic)
+            continue;
         TransformComponent& tf =  *_world.getComponent<TransformComponent>(e);
 
         tf.position += rb.velocity * _dt;
