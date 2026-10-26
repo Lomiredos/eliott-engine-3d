@@ -11,8 +11,8 @@
 struct CameraComponent
 {
     float fov = 45.0f; // champ de vision vertical, degres
-    float nearZ = 0.1f;
-    float farZ = 200.0f;
+    float nearZ = 0.1f;  // distance min affichee, > 0 (borne a 0.01)
+    float farZ = 200.0f; // distance max affichee, > nearZ
     bool isMain = true;
 };
 

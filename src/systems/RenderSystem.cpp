@@ -5,6 +5,7 @@
 
 #include "math/Quaternion.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <variant>
@@ -243,9 +244,11 @@ ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
   cam.pos = pos;
   cam.yaw = std::atan2(f.z, f.x); // convention Camera : avant = (cos, ., sin)
   cam.pitch = std::asin(fy);
-  cam.fovDeg = fovDeg;
-  cam.nearZ = nearZ;
-  cam.farZ = farZ;
+  // Valeurs bornees : nearZ <= 0 (ou fov hors de ]0,180[) casse la
+  // perspective et la camera ne voit plus rien.
+  cam.fovDeg = std::clamp(fovDeg, 1.0f, 179.0f);
+  cam.nearZ = std::max(nearZ, 0.01f);
+  cam.farZ = std::max(farZ, cam.nearZ + 0.01f);
   return cam;
 }
 
