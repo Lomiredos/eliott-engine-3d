@@ -54,6 +54,8 @@ add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
     src/reflect/CatalogGen.cpp
     src/reflect/SceneBind.cpp
+    src/ipc/Socket.cpp
+    src/ipc/SharedFrame.cpp
 )
 
 target_include_directories(ee-core PUBLIC
@@ -97,6 +99,14 @@ target_link_libraries(ee-core PUBLIC
     eliott-ecs
     eliott-input
 )
+
+# Lien editeur <-> jeu (visu/ipc) : sockets Winsock sous Windows, shm_open
+# (librt) sous Linux.
+if(WIN32)
+    target_link_libraries(ee-core PUBLIC ws2_32)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(ee-core PUBLIC rt)
+endif()
 
 # ---------------------------------------------------------------------------
 # Outil de regeneration du catalogue de composants du PROJET (jamais dans
