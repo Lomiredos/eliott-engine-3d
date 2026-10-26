@@ -1,4 +1,5 @@
 #include "visu/core/MeshStore.hpp"
+#include "visu/render/MeshUtil.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -13,26 +14,26 @@ std::filesystem::path g_baseDir;
 namespace {
 using Vec3 = ee::math::Vector3<float>;
 
-void parseFaceToken(const std::string &_tok, int _posCount, int _normCount,
-                    int &_pi, int &_ni) {
-  _pi = _ni = -1;
+// "p", "p/t", "p//n" ou "p/t/n" (index 1-based, ou negatifs = depuis la fin).
+void parseFaceToken(const std::string &_tok, int _posCount, int _uvCount,
+                    int _normCount, int &_pi, int &_ti, int &_ni) {
+  _pi = _ti = _ni = -1;
+  auto idx = [](const std::string &_s, int _count) {
+    if (_s.empty())
+      return -1;
+    int v = std::stoi(_s);
+    return (v > 0) ? v - 1 : _count + v;
+  };
   auto slash1 = _tok.find('/');
-  std::string pPart =
-      (slash1 == std::string::npos) ? _tok : _tok.substr(0, slash1);
-  if (!pPart.empty()) {
-    int v = std::stoi(pPart);
-    _pi = (v > 0) ? v - 1 : _posCount + v;
-  }
-  if (slash1 != std::string::npos) {
-    auto slash2 = _tok.find('/', slash1 + 1);
-    if (slash2 != std::string::npos) {
-      std::string nPart = _tok.substr(slash2 + 1);
-      if (!nPart.empty()) {
-        int v = std::stoi(nPart);
-        _ni = (v > 0) ? v - 1 : _normCount + v;
-      }
-    }
-  }
+  _pi = idx(slash1 == std::string::npos ? _tok : _tok.substr(0, slash1), _posCount);
+  if (slash1 == std::string::npos)
+    return;
+  auto slash2 = _tok.find('/', slash1 + 1);
+  _ti = idx(_tok.substr(slash1 + 1, slash2 == std::string::npos ? std::string::npos
+                                                                 : slash2 - slash1 - 1),
+            _uvCount);
+  if (slash2 != std::string::npos)
+    _ni = idx(_tok.substr(slash2 + 1), _normCount);
 }
 
 ee::core::CpuMesh loadObj(const std::string &_path) {
@@ -43,6 +44,8 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
 
   std::vector<Vec3> positions;
   std::vector<Vec3> normals;
+  std::vector<std::pair<float, float>> uvs;
+  std::vector<float> v8; // position, normale, uv (tangentes ajoutees a la fin)
 
   try {
     std::string line;
@@ -54,6 +57,10 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
         Vec3 p;
         ls >> p.x >> p.y >> p.z;
         positions.push_back(p);
+      } else if (tag == "vt") {
+        float u = 0.0f, w = 0.0f;
+        ls >> u >> w;
+        uvs.push_back({u, w});
       } else if (tag == "vn") {
         Vec3 n;
         ls >> n.x >> n.y >> n.z;
@@ -69,12 +76,12 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
         // Triangulation en eventail (v0, vi, vi+1).
         for (size_t i = 1; i + 1 < toks.size(); ++i) {
           const std::string *tri[3] = {&toks[0], &toks[i], &toks[i + 1]};
-          int pi[3], ni[3];
+          int pi[3], ti[3], ni[3];
           Vec3 pos[3];
           bool ok = true;
           for (int k = 0; k < 3; ++k) {
-            parseFaceToken(*tri[k], (int)positions.size(), (int)normals.size(),
-                           pi[k], ni[k]);
+            parseFaceToken(*tri[k], (int)positions.size(), (int)uvs.size(),
+                           (int)normals.size(), pi[k], ti[k], ni[k]);
             if (pi[k] < 0 || pi[k] >= (int)positions.size()) {
               ok = false;
               break;
@@ -90,8 +97,11 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
             Vec3 n = (ni[k] >= 0 && ni[k] < (int)normals.size())
                          ? normals[ni[k]]
                          : faceN;
-            mesh.verts.insert(mesh.verts.end(),
-                              {pos[k].x, pos[k].y, pos[k].z, n.x, n.y, n.z});
+            std::pair<float, float> uv =
+                (ti[k] >= 0 && ti[k] < (int)uvs.size()) ? uvs[ti[k]]
+                                                        : std::pair<float, float>{0.0f, 0.0f};
+            v8.insert(v8.end(), {pos[k].x, pos[k].y, pos[k].z, n.x, n.y,
+                                 n.z, uv.first, uv.second});
             mesh.idx.push_back((unsigned int)mesh.idx.size());
           }
         }
@@ -103,6 +113,7 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
 
   if (mesh.idx.empty())
     return mesh; // valid == false
+  mesh.verts = ee::render::withTangents(v8, mesh.idx);
 
   // AABB depuis toutes les positions (borne valide, meme si super-ensemble).
   mesh.aabbMin = positions[0];
@@ -123,6 +134,11 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
 
 namespace ee::core {
 void setMeshBaseDir(const std::filesystem::path &_dir) { g_baseDir = _dir; }
+
+std::filesystem::path assetPath(const std::string &_path) {
+  std::filesystem::path p(_path);
+  return (p.is_absolute() || _path.empty()) ? p : g_baseDir / p;
+}
 
 CpuMesh &getMesh(const std::string &_path) {
   static std::unordered_map<std::string, CpuMesh> cache;

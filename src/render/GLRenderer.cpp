@@ -9,6 +9,10 @@
 #include <vector>
 
 #include "math/Quaternion.hpp"
+#include "visu/render/MeshUtil.hpp"
+
+#include <algorithm>
+#include <stb_image.h>
 
 // ---------------------------------------------------------------------------
 // Petites matrices 4x4 en column-major (convention OpenGL) + shaders.
@@ -137,24 +141,99 @@ namespace
         return r;
     }
 
+    // Shader standard : PBR metal/rugosite (Cook-Torrance GGX), soleil +
+    // lumieres ponctuelles + ambiante, puis tone mapping ACES et gamma.
+    // uGlow > 0 : couleur plate (contours fil de fer, surbrillance).
     const char *kVert = R"(#version 330 core
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNormal;
+layout(location=2) in vec2 aUV;
+layout(location=3) in vec4 aTangent;
 uniform mat4 uMVP;
 uniform mat4 uModel;
+uniform vec4 uUVTransform; // xy = repetition, zw = decalage
+out vec3 vWorldPos;
 out vec3 vNormal;
+out vec2 vUV;
+out vec4 vTangent;
 void main()
 {
     gl_Position = uMVP * vec4(aPos, 1.0);
-    vNormal = mat3(uModel) * aNormal;
+    vWorldPos = (uModel * vec4(aPos, 1.0)).xyz;
+    mat3 normalMat = transpose(inverse(mat3(uModel))); // echelle non uniforme
+    vNormal = normalMat * aNormal;
+    vTangent = vec4(mat3(uModel) * aTangent.xyz, aTangent.w);
+    vUV = aUV * uUVTransform.xy + uUVTransform.zw;
 }
 )";
 
     const char *kFrag = R"(#version 330 core
+in vec3 vWorldPos;
 in vec3 vNormal;
-uniform vec3 uColor;
-uniform float uGlow; // 0 = ombrage normal, >0 = couleur plate avec alpha=uGlow (glow)
+in vec2 vUV;
+in vec4 vTangent;
+
+uniform vec3 uColor;      // albedo (sRGB)
+uniform float uGlow;      // 0 = eclaire, >0 = couleur plate avec alpha=uGlow
+uniform float uMetallic;
+uniform float uRoughness;
+uniform float uAO;
+uniform vec3 uEmissive;   // sRGB
+uniform float uEmissiveIntensity;
+uniform float uNormalStrength;
+uniform int uMapMask;     // bit i = map MapSlot i presente
+uniform sampler2D uAlbedoMap;
+uniform sampler2D uNormalMap;
+uniform sampler2D uMetallicMap;
+uniform sampler2D uRoughnessMap;
+uniform sampler2D uAOMap;
+uniform sampler2D uEmissiveMap;
+
+uniform vec3 uCamPos;
+uniform vec3 uAmbient;    // lineaire, intensite comprise
+uniform int uSunOn;
+uniform vec3 uSunDir;     // direction de la lumiere (vers la scene)
+uniform vec3 uSunColor;   // lineaire, intensite comprise
+uniform int uPointCount;
+uniform vec3 uPointPos[8];
+uniform vec3 uPointColor[8];
+uniform float uPointRange[8];
+
 out vec4 FragColor;
+const float PI = 3.14159265;
+
+vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
+
+float distributionGGX(float NdH, float a)
+{
+    float a2 = a * a;
+    float d = NdH * NdH * (a2 - 1.0) + 1.0;
+    return a2 / (PI * d * d);
+}
+
+float geometrySmith(float NdV, float NdL, float rough)
+{
+    float k = (rough + 1.0) * (rough + 1.0) / 8.0;
+    return (NdV / (NdV * (1.0 - k) + k)) * (NdL / (NdL * (1.0 - k) + k));
+}
+
+// Lumiere recue d'une direction L (radiance deja attenuee).
+vec3 shade(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float metal, float rough)
+{
+    float NdL = max(dot(N, L), 0.0);
+    if (NdL <= 0.0)
+        return vec3(0.0);
+    vec3 H = normalize(V + L);
+    float NdV = max(dot(N, V), 1e-4);
+    float NdH = max(dot(N, H), 0.0);
+    vec3 F0 = mix(vec3(0.04), albedo, metal);
+    vec3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+    vec3 spec = distributionGGX(NdH, rough * rough) * geometrySmith(NdV, NdL, rough) * F
+              / (4.0 * NdV * NdL + 1e-4);
+    vec3 kd = (1.0 - F) * (1.0 - metal);
+    return (kd * albedo / PI + spec) * radiance * NdL;
+}
+
 void main()
 {
     if (uGlow > 0.0)
@@ -162,10 +241,60 @@ void main()
         FragColor = vec4(uColor, uGlow);
         return;
     }
-    vec3 N = normalize(vNormal);
-    vec3 L = normalize(vec3(0.5, 1.0, 0.3));
-    float d = max(dot(N, L), 0.0) * 0.8 + 0.2;
-    FragColor = vec4(uColor * d, 1.0);
+
+    vec3 albedo = toLinear(uColor);
+    if ((uMapMask & 1) != 0)
+        albedo *= texture(uAlbedoMap, vUV).rgb; // texture sRGB : deja lineaire
+    float metal = uMetallic;
+    if ((uMapMask & 4) != 0)
+        metal *= texture(uMetallicMap, vUV).r;
+    float rough = uRoughness;
+    if ((uMapMask & 8) != 0)
+        rough *= texture(uRoughnessMap, vUV).r;
+    rough = clamp(rough, 0.04, 1.0);
+    float ao = uAO;
+    if ((uMapMask & 16) != 0)
+        ao *= texture(uAOMap, vUV).r;
+
+    vec3 N = normalize(vNormal); // normales du mesh (pas de culling : sens des triangles libre)
+    if ((uMapMask & 2) != 0)
+    {
+        vec3 T = normalize(vTangent.xyz - N * dot(N, vTangent.xyz));
+        vec3 B = cross(N, T) * vTangent.w;
+        vec3 tn = texture(uNormalMap, vUV).xyz * 2.0 - 1.0;
+        tn.xy *= uNormalStrength;
+        N = normalize(mat3(T, B, N) * tn);
+    }
+    vec3 V = normalize(uCamPos - vWorldPos);
+
+    // Ambiante : diffuse + reflet approche (pas de carte d'environnement ;
+    // sans reflet, un metal, qui n'a pas de diffus, serait noir). Le reflet
+    // prend aussi un peu du soleil, comme un ciel.
+    float NdV = max(dot(N, V), 1e-4);
+    vec3 F0 = mix(vec3(0.04), albedo, metal);
+    vec3 Fenv = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - NdV, 5.0);
+    vec3 envLight = uAmbient + (uSunOn != 0 ? uSunColor * 0.2 : vec3(0.0));
+    vec3 color = (uAmbient * (1.0 - Fenv) * (1.0 - metal) * albedo + envLight * Fenv) * ao;
+    if (uSunOn != 0)
+        color += shade(N, V, normalize(-uSunDir), uSunColor, albedo, metal, rough);
+    for (int i = 0; i < uPointCount; ++i)
+    {
+        vec3 d = uPointPos[i] - vWorldPos;
+        float dist = length(d);
+        float r = max(uPointRange[i], 1e-3);
+        float f = clamp(1.0 - pow(dist / r, 4.0), 0.0, 1.0);
+        float att = f * f / (dist * dist + 1.0);
+        color += shade(N, V, d / max(dist, 1e-4), uPointColor[i] * att, albedo, metal, rough);
+    }
+
+    vec3 emissive = toLinear(uEmissive) * uEmissiveIntensity;
+    if ((uMapMask & 32) != 0)
+        emissive *= texture(uEmissiveMap, vUV).rgb;
+    color += emissive;
+
+    // Tone mapping ACES (approx. Narkowicz) puis gamma.
+    color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
+    FragColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
 }
 )";
 
@@ -222,6 +351,30 @@ namespace ee::render
         m_uModel = glGetUniformLocation(m_program, "uModel");
         m_uColor = glGetUniformLocation(m_program, "uColor");
         m_uGlow = glGetUniformLocation(m_program, "uGlow");
+        m_uMetallic = glGetUniformLocation(m_program, "uMetallic");
+        m_uRoughness = glGetUniformLocation(m_program, "uRoughness");
+        m_uAO = glGetUniformLocation(m_program, "uAO");
+        m_uEmissive = glGetUniformLocation(m_program, "uEmissive");
+        m_uEmissiveIntensity = glGetUniformLocation(m_program, "uEmissiveIntensity");
+        m_uNormalStrength = glGetUniformLocation(m_program, "uNormalStrength");
+        m_uUVTransform = glGetUniformLocation(m_program, "uUVTransform");
+        m_uMapMask = glGetUniformLocation(m_program, "uMapMask");
+        m_uCamPos = glGetUniformLocation(m_program, "uCamPos");
+        m_uAmbient = glGetUniformLocation(m_program, "uAmbient");
+        m_uSunOn = glGetUniformLocation(m_program, "uSunOn");
+        m_uSunDir = glGetUniformLocation(m_program, "uSunDir");
+        m_uSunColor = glGetUniformLocation(m_program, "uSunColor");
+        m_uPointCount = glGetUniformLocation(m_program, "uPointCount");
+        m_uPointPos = glGetUniformLocation(m_program, "uPointPos");
+        m_uPointColor = glGetUniformLocation(m_program, "uPointColor");
+        m_uPointRange = glGetUniformLocation(m_program, "uPointRange");
+
+        // Une unite de texture fixe par map (ordre de MapSlot).
+        glUseProgram(m_program);
+        const char *samplers[] = {"uAlbedoMap", "uNormalMap", "uMetallicMap",
+                                  "uRoughnessMap", "uAOMap", "uEmissiveMap"};
+        for (int i = 0; i < static_cast<int>(MapSlot::Count); ++i)
+            glUniform1i(glGetUniformLocation(m_program, samplers[i]), i);
 
         // --- Meshes integres : sphere, cube, cylindre (unitaires) ---
         const float PI = 3.14159265358979323846f;
@@ -229,7 +382,7 @@ namespace ee::render
         // Sphere UV unitaire (position == normale).
         {
             const int stacks = 16, sectors = 24;
-            std::vector<float> v; // x,y,z, nx,ny,nz
+            std::vector<float> v; // x,y,z, nx,ny,nz, u,v
             std::vector<unsigned int> ix;
             for (int i = 0; i <= stacks; ++i)
             {
@@ -239,7 +392,8 @@ namespace ee::render
                 {
                     float theta = 2.0f * PI * (float)j / sectors;
                     float x = r * std::cos(theta), z = r * std::sin(theta);
-                    v.insert(v.end(), {x, y, z, x, y, z});
+                    v.insert(v.end(), {x, y, z, x, y, z,
+                                       1.0f - (float)j / sectors, 1.0f - (float)i / stacks});
                 }
             }
             for (int i = 0; i < stacks; ++i)
@@ -249,6 +403,7 @@ namespace ee::render
                     unsigned int b = a + sectors + 1;
                     ix.insert(ix.end(), {a, b, a + 1, a + 1, b, b + 1});
                 }
+            v = withTangents(v, ix);
             m_sphere = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
 
             // Aretes seules : anneaux de latitude + meridiens, jamais les
@@ -287,14 +442,16 @@ namespace ee::render
             };
             std::vector<float> v;
             std::vector<unsigned int> ix;
+            const float uv[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}}; // texture entiere par face
             for (int f = 0; f < 6; ++f)
             {
                 unsigned int base = f * 4;
                 for (int k = 0; k < 4; ++k)
                     v.insert(v.end(), {faces[f].v[k][0], faces[f].v[k][1], faces[f].v[k][2],
-                                       faces[f].n[0], faces[f].n[1], faces[f].n[2]});
+                                       faces[f].n[0], faces[f].n[1], faces[f].n[2], uv[k][0], uv[k][1]});
                 ix.insert(ix.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
             }
+            v = withTangents(v, ix);
             m_cube = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
 
             // Aretes seules : le perimetre de chaque face, pas la diagonale
@@ -321,8 +478,9 @@ namespace ee::render
             {
                 float theta = 2.0f * PI * (float)j / sectors;
                 float cx = std::cos(theta), cz = std::sin(theta);
-                v.insert(v.end(), {cx, -hh, cz, cx, 0.0f, cz});
-                v.insert(v.end(), {cx, hh, cz, cx, 0.0f, cz});
+                float u = 1.0f - (float)j / sectors;
+                v.insert(v.end(), {cx, -hh, cz, cx, 0.0f, cz, u, 0.0f});
+                v.insert(v.end(), {cx, hh, cz, cx, 0.0f, cz, u, 1.0f});
             }
             for (int j = 0; j < sectors; ++j)
             {
@@ -333,13 +491,14 @@ namespace ee::render
             // Disques haut (+Y) et bas (-Y) : un centre + un anneau.
             auto addCap = [&](float y, float ny)
             {
-                unsigned int center = (unsigned int)(v.size() / 6);
-                v.insert(v.end(), {0.0f, y, 0.0f, 0.0f, ny, 0.0f});
-                unsigned int first = (unsigned int)(v.size() / 6);
+                unsigned int center = (unsigned int)(v.size() / 8);
+                v.insert(v.end(), {0.0f, y, 0.0f, 0.0f, ny, 0.0f, 0.5f, 0.5f});
+                unsigned int first = (unsigned int)(v.size() / 8);
                 for (int j = 0; j <= sectors; ++j)
                 {
                     float theta = 2.0f * PI * (float)j / sectors;
-                    v.insert(v.end(), {std::cos(theta), y, std::sin(theta), 0.0f, ny, 0.0f});
+                    float c = std::cos(theta), sn = std::sin(theta);
+                    v.insert(v.end(), {c, y, sn, 0.0f, ny, 0.0f, 0.5f + 0.5f * c, 0.5f + 0.5f * sn * ny});
                 }
                 for (int j = 0; j < sectors; ++j)
                 {
@@ -353,6 +512,7 @@ namespace ee::render
             addCap(hh, 1.0f);
             addCap(-hh, -1.0f);
 
+            v = withTangents(v, ix);
             m_cylinder = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
 
             // Aretes seules : les 2 anneaux (haut/bas) + les verticales,
@@ -381,7 +541,8 @@ namespace ee::render
                 {
                     float theta = 2.0f * PI * (float)j / sectors;
                     float x = r * std::cos(theta), z = r * std::sin(theta);
-                    v.insert(v.end(), {x, y, z, x, y, z});
+                    v.insert(v.end(), {x, y, z, x, y, z,
+                                       1.0f - (float)j / sectors, 1.0f - 0.5f * (float)i / stacks});
                 }
             }
             for (int i = 0; i < stacks; ++i)
@@ -391,6 +552,7 @@ namespace ee::render
                     unsigned int b = a + sectors + 1;
                     ix.insert(ix.end(), {a, b, a + 1, a + 1, b, b + 1});
                 }
+            v = withTangents(v, ix);
             m_hemisphere = uploadMesh(v.data(), (int)v.size(), ix.data(), (int)ix.size());
 
             std::vector<unsigned int> wireIx;
@@ -515,6 +677,106 @@ namespace ee::render
 
         glUseProgram(m_program);
         glUniform1f(m_uGlow, 0.0f); // chaque drawMesh bindera son propre VAO
+        m_camPos[0] = eye[0];
+        m_camPos[1] = eye[1];
+        m_camPos[2] = eye[2];
+        glUniform3fv(m_uCamPos, 1, m_camPos);
+        applyLights();
+    }
+
+    // Couleur sRGB * intensite -> lineaire (ce qu'attend le shader).
+    static void linearColor(const Color &_c, float _intensity, float _out[3])
+    {
+        _out[0] = std::pow(_c.r, 2.2f) * _intensity;
+        _out[1] = std::pow(_c.g, 2.2f) * _intensity;
+        _out[2] = std::pow(_c.b, 2.2f) * _intensity;
+    }
+
+    void GLRenderer::setLights(const Lights &lights)
+    {
+        m_lights = lights;
+        if (m_init)
+        {
+            glUseProgram(m_program);
+            applyLights();
+        }
+    }
+
+    void GLRenderer::applyLights()
+    {
+        float c[3];
+        linearColor(m_lights.ambient, m_lights.ambientIntensity, c);
+        glUniform3fv(m_uAmbient, 1, c);
+        glUniform1i(m_uSunOn, m_lights.sun ? 1 : 0);
+        float d[3] = {m_lights.sunDir.x, m_lights.sunDir.y, m_lights.sunDir.z};
+        glUniform3fv(m_uSunDir, 1, d);
+        linearColor(m_lights.sunColor, m_lights.sunIntensity, c);
+        glUniform3fv(m_uSunColor, 1, c);
+
+        const int count = std::min(static_cast<int>(m_lights.points.size()), kMaxPointLights);
+        float pos[kMaxPointLights * 3], col[kMaxPointLights * 3], range[kMaxPointLights];
+        for (int i = 0; i < count; ++i)
+        {
+            const PointLight &p = m_lights.points[i];
+            pos[i * 3] = p.pos.x;
+            pos[i * 3 + 1] = p.pos.y;
+            pos[i * 3 + 2] = p.pos.z;
+            linearColor(p.color, p.intensity, &col[i * 3]);
+            range[i] = p.range;
+        }
+        glUniform1i(m_uPointCount, count);
+        if (count > 0)
+        {
+            glUniform3fv(m_uPointPos, count, pos);
+            glUniform3fv(m_uPointColor, count, col);
+            glUniform1fv(m_uPointRange, count, range);
+        }
+    }
+
+    TextureHandle GLRenderer::loadTexture(const std::string &path, bool srgb)
+    {
+        if (path.empty() || !ensureInit())
+            return 0;
+        namespace fs = std::filesystem;
+        const std::string key = (srgb ? "s|" : "l|") + path;
+        CachedTexture &ct = m_textures[key];
+
+        // Fichier modifie (re-export) : recharge, verifie au plus 1 fois/s.
+        auto now = std::chrono::steady_clock::now();
+        bool fresh = ct.lastCheck.time_since_epoch().count() == 0;
+        if (!fresh && now - ct.lastCheck < std::chrono::seconds(1))
+            return ct.tex;
+        ct.lastCheck = now;
+        std::error_code ec;
+        fs::file_time_type mtime = fs::last_write_time(path, ec);
+        if (ec)
+            return ct.tex; // fichier absent : on garde l'ancienne (ou 0)
+        if (!fresh && ct.tex != 0 && mtime == ct.mtime)
+            return ct.tex;
+        ct.mtime = mtime;
+
+        int w = 0, h = 0, n = 0;
+        stbi_set_flip_vertically_on_load(1); // uv (0,0) = bas gauche, comme GL
+        unsigned char *px = stbi_load(path.c_str(), &w, &h, &n, 4);
+        if (!px)
+        {
+            std::fprintf(stderr, "[GLRenderer] texture illisible : %s\n", path.c_str());
+            return ct.tex;
+        }
+        if (ct.tex == 0)
+            glGenTextures(1, &ct.tex);
+        glBindTexture(GL_TEXTURE_2D, ct.tex);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, w, h, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, px);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        stbi_image_free(px);
+        return ct.tex;
     }
 
     MeshHandle GLRenderer::uploadMesh(const float *verts, int vertFloatCount,
@@ -530,10 +792,16 @@ namespace ee::render
         glBufferData(GL_ARRAY_BUFFER, (long long)(vertFloatCount * sizeof(float)), verts, GL_STATIC_DRAW);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e.ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (long long)(idxCount * sizeof(unsigned int)), idx, GL_STATIC_DRAW);
+        // Format kVertexFloats : position, normale, uv, tangente (MeshUtil.hpp).
+        const int stride = kVertexFloats * sizeof(float);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *)(6 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void *)(8 * sizeof(float)));
         glBindVertexArray(0);
         m_meshes.push_back(e);
         return (MeshHandle)m_meshes.size(); // handle = index + 1
@@ -581,7 +849,7 @@ namespace ee::render
         return uploadMesh(verts, vertFloatCount, indices, indexCount);
     }
 
-    void GLRenderer::drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg, Color col)
+    void GLRenderer::drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg, const Material &mat)
     {
         if (!m_init || mesh == 0 || mesh > m_meshes.size())
             return;
@@ -599,7 +867,26 @@ namespace ee::render
         glBindVertexArray(m.vao);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo); // attachWireIndices a pu changer l'EBO du VAO
         glUniform1f(m_uGlow, 0.0f);
-        glUniform3f(m_uColor, col.r, col.g, col.b);
+        glUniform3f(m_uColor, mat.albedo.r, mat.albedo.g, mat.albedo.b);
+        glUniform1f(m_uMetallic, mat.metallic);
+        glUniform1f(m_uRoughness, mat.roughness);
+        glUniform1f(m_uAO, mat.ao);
+        glUniform3f(m_uEmissive, mat.emissive.r, mat.emissive.g, mat.emissive.b);
+        glUniform1f(m_uEmissiveIntensity, mat.emissiveIntensity);
+        glUniform1f(m_uNormalStrength, mat.normalStrength);
+        glUniform4f(m_uUVTransform, mat.tiling[0], mat.tiling[1], mat.offset[0], mat.offset[1]);
+
+        int mask = 0;
+        for (int i = 0; i < static_cast<int>(MapSlot::Count); ++i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, mat.maps[i]);
+            if (mat.maps[i] != 0)
+                mask |= 1 << i;
+        }
+        glActiveTexture(GL_TEXTURE0);
+        glUniform1i(m_uMapMask, mask);
+
         glUniformMatrix4fv(m_uMVP, 1, GL_FALSE, mvp.m);
         glUniformMatrix4fv(m_uModel, 1, GL_FALSE, model.m);
         glDrawElements(GL_TRIANGLES, m.indexCount, GL_UNSIGNED_INT, nullptr);

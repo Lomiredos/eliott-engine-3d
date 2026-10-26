@@ -21,6 +21,9 @@
 #include "visu/components/MeshComponent.hpp"
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/CameraComponent.hpp"
+#include "visu/components/LightComponents.hpp"
+#include "visu/components/MaterialComponent.hpp"
+#include "visu/core/MaterialStore.hpp"
 #include "visu/systems/RenderSystem.hpp" // drawColliderWire
 #include "visu/scene/Hierarchy.hpp"
 
@@ -30,12 +33,53 @@
 
 namespace ee::scene
 {
+    // Eclairage depuis le World : meme regles que sceneLights (editeur).
+    inline ee::render::Lights worldLights(ee::ecs::World &_w, const std::vector<ee::ecs::EntityID> &_ents)
+    {
+        ee::render::Lights lights;
+        bool anyLight = false, sunSet = false;
+        for (ee::ecs::EntityID e : _ents)
+        {
+            if (!_w.hasComponent<TransformComponent>(e))
+                continue;
+            if (_w.hasComponent<DirectionalLightComponent>(e) && !sunSet)
+            {
+                const DirectionalLightComponent &l = *_w.getComponent<DirectionalLightComponent>(e);
+                ee::math::Vector3<float> f = worldXform(_w, e).rot.forward();
+                lights.sunDir = {f.x, f.y, f.z};
+                lights.sunColor = {l.color.r, l.color.g, l.color.b};
+                lights.sunIntensity = l.intensity;
+                sunSet = anyLight = true;
+            }
+            if (_w.hasComponent<PointLightComponent>(e))
+            {
+                const PointLightComponent &l = *_w.getComponent<PointLightComponent>(e);
+                Xform wx = worldXform(_w, e);
+                lights.points.push_back({{wx.pos.x, wx.pos.y, wx.pos.z},
+                                         {l.color.r, l.color.g, l.color.b},
+                                         l.intensity,
+                                         l.range});
+                anyLight = true;
+            }
+            if (_w.hasComponent<AmbientLightComponent>(e))
+            {
+                const AmbientLightComponent &l = *_w.getComponent<AmbientLightComponent>(e);
+                lights.ambient = {l.color.r, l.color.g, l.color.b};
+                lights.ambientIntensity = l.intensity;
+            }
+        }
+        if (anyLight && !sunSet)
+            lights.sun = false;
+        return lights;
+    }
+
     // _selected = index (dans _ents) de l'entite dont le collider est dessine
     // en fil de fer, -1 = aucun (aide de debug du Play dans l'editeur).
     inline void renderWorld(ee::render::IRenderer &_r, ee::ecs::World &_w,
                             const std::vector<ee::ecs::EntityID> &_ents,
                             int _selected = -1)
     {
+        _r.setLights(worldLights(_w, _ents));
         for (size_t idx = 0; idx < _ents.size(); ++idx)
         {
             ee::ecs::EntityID e = _ents[idx];
@@ -47,12 +91,23 @@ namespace ee::scene
             ee::render::Vec3 euler{wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z};
             const float scx = wx.scale.x, scy = wx.scale.y, scz = wx.scale.z;
 
+            // Materiau (.mat) de l'entite, sinon couleur unie de la forme.
+            const ee::core::MaterialAsset *asset =
+                _w.hasComponent<MaterialComponent>(e)
+                    ? ee::core::getMaterial(_w.getComponent<MaterialComponent>(e)->path)
+                    : nullptr;
+            auto matFor = [&](ee::render::Color _fallback)
+            {
+                return asset ? ee::systems::renderMaterial(_r, *asset)
+                             : ee::systems::colorMaterial(_fallback);
+            };
+
             if (_w.hasComponent<SphereComponent>(e))
             {
                 float radius = _w.getComponent<SphereComponent>(e)->radius;
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), pos,
                             {radius * scx, radius * scy, radius * scz}, euler,
-                            ee::render::Color{0.85f, 0.20f, 0.20f});
+                            matFor({0.85f, 0.20f, 0.20f}));
             }
 
             if (_w.hasComponent<RectComponent>(e))
@@ -60,7 +115,7 @@ namespace ee::scene
                 RectComponent &rc = *_w.getComponent<RectComponent>(e);
                 _r.drawMesh(_r.builtin(ee::render::Prim::Cube), pos,
                             {rc.size.x * scx, rc.size.y * scy, rc.size.z * scz}, euler,
-                            ee::render::Color{0.85f, 0.20f, 0.20f});
+                            matFor({0.85f, 0.20f, 0.20f}));
             }
 
             if (_w.hasComponent<CapsuleComponent>(e))
@@ -68,7 +123,7 @@ namespace ee::scene
                 CapsuleComponent &cc = *_w.getComponent<CapsuleComponent>(e);
                 float rr = cc.radius * scx;
                 float hh = cc.height * scy;
-                ee::render::Color capCol{0.20f, 0.55f, 0.85f};
+                ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
 
                 _r.drawMesh(_r.builtin(ee::render::Prim::Cylinder), pos,
                             ee::render::Vec3{rr, hh, rr}, euler, capCol);
@@ -91,7 +146,7 @@ namespace ee::scene
                         cm.gpu = _r.createMesh(cm.verts.data(), (int)cm.verts.size(),
                                                cm.idx.data(), (int)cm.idx.size());
                     _r.drawMesh(cm.gpu, pos, ee::render::Vec3{scx, scy, scz}, euler,
-                                ee::render::Color{0.80f, 0.80f, 0.85f});
+                                matFor({0.80f, 0.80f, 0.85f}));
                 }
             }
 

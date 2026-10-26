@@ -93,6 +93,10 @@ namespace ee::scene
         _reg.reg<RigideBodyComponent>();
         _reg.reg<ColliderComponent>();
         _reg.reg<CameraComponent>();
+        _reg.reg<MaterialComponent>();
+        _reg.reg<DirectionalLightComponent>();
+        _reg.reg<PointLightComponent>();
+        _reg.reg<AmbientLightComponent>();
     }
 
     inline std::vector<ee::ecs::EntityID> loadSceneIntoWorld(ee::ecs::World &_world,

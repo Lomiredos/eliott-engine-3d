@@ -45,10 +45,12 @@ endif()
 add_library(ee-core STATIC
     src/core/SceneInfo.cpp
     src/core/MeshStore.cpp
+    src/core/MaterialStore.cpp
     src/core/SceneQuery.cpp
     src/core/SystemInfo.cpp
     src/render/GLRenderer.cpp
     src/render/RendererService.cpp
+    src/render/StbImage.cpp
     src/systems/RenderSystem.cpp
     src/systems/PickingSystem.cpp
     src/systems/SystemScheduler.cpp
@@ -62,6 +64,8 @@ target_include_directories(ee-core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
 )
+# stb_image (chargement des textures) : prive, seul GLRenderer s'en sert.
+target_include_directories(ee-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
 
 # ---------------------------------------------------------------------------
 # Sidecars des systemes moteur (include/visu/systems/<Nom>.json) : embarques

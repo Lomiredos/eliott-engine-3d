@@ -3,6 +3,7 @@
 #include "visu/core/SceneInfo.hpp"
 
 #include "visu/render/Renderer.hpp"
+#include "visu/core/MaterialStore.hpp"
 
 #include <string>
 #include <vector>
@@ -58,4 +59,22 @@ bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out);
 // dans l'editeur une entite camera, qui n'a pas de forme a elle.
 void drawCameraGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
                      ee::render::Vec3 eulerDeg, bool selected);
+
+// Materiau uni d'une couleur (formes sans MaterialComponent).
+ee::render::Material colorMaterial(ee::render::Color albedo);
+
+// Materiau .mat -> materiau du renderer (textures chargees via r, chemins
+// relatifs a la racine du projet).
+ee::render::Material renderMaterial(ee::render::IRenderer &r,
+                                    const ee::core::MaterialAsset &asset);
+
+// Eclairage decrit par la scene (Directional/Point/AmbientLightComponent,
+// positions et directions monde). Sans lumiere : soleil + ambiance par defaut.
+ee::render::Lights sceneLights(const SceneInfo &scene);
+
+// Lumiere en fil de fer pour l'editeur : petite sphere, + fleche (soleil)
+// ou portee (ampoule selectionnee).
+void drawLightGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
+                    ee::render::Vec3 eulerDeg, bool directional, float range,
+                    bool selected);
 }

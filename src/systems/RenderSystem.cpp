@@ -3,6 +3,7 @@
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
 #include "visu/scene/Hierarchy.hpp"
+#include "visu/core/MaterialStore.hpp"
 
 #include "math/Quaternion.hpp"
 
@@ -59,6 +60,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
                  int selected, bool editorOverlays) {
   // Transforms monde (hierarchie parent/enfant resolue).
   const std::vector<ee::scene::Xform> world = ee::scene::sceneWorldXforms(scene);
+  r.setLights(sceneLights(scene));
   for (std::size_t idx = 0; idx < scene.entities.size(); ++idx) {
     const EntityInfo &ent = scene.entities[idx];
     const ComponentInstance *tf = nullptr;
@@ -68,6 +70,9 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     const ComponentInstance *mp = nullptr;
     const ComponentInstance *cc = nullptr;
     const ComponentInstance *cam = nullptr;
+    const ComponentInstance *matc = nullptr;
+    const ComponentInstance *dirLight = nullptr;
+    const ComponentInstance *pointLight = nullptr;
     for (const auto &ci : ent.components) {
       if (ci.name == "TransformComponent")
         tf = &ci;
@@ -83,6 +88,12 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
         cc = &ci;
       else if (ci.name == "CameraComponent")
         cam = &ci;
+      else if (ci.name == "MaterialComponent")
+        matc = &ci;
+      else if (ci.name == "DirectionalLightComponent")
+        dirLight = &ci;
+      else if (ci.name == "PointLightComponent")
+        pointLight = &ci;
     }
     if (!tf)
       continue;
@@ -94,11 +105,18 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     float scy = wx.scale.y;
     float scz = wx.scale.z;
 
+    // Materiau de l'entite (.mat), sinon couleur unie propre a chaque forme.
+    const ee::core::MaterialAsset *asset =
+        matc ? ee::core::getMaterial(stringOf(matc->values, "path")) : nullptr;
+    auto matFor = [&](ee::render::Color _fallback) {
+      return asset ? renderMaterial(r, *asset) : colorMaterial(_fallback);
+    };
+
     if (sp) {
       float radius = valueOf(sp->values, "radius", 1.0f);
       ee::render::Vec3 radii{radius * scx, radius * scy, radius * scz};
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), pos, radii, euler,
-                 ee::render::Color{0.85f, 0.20f, 0.20f});
+                 matFor({0.85f, 0.20f, 0.20f}));
     }
 
     if (rp) {
@@ -106,7 +124,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
                             valueOf(rp->values, "sizeY", 1.0f) * scy,
                             valueOf(rp->values, "sizeZ", 1.0f) * scz};
       r.drawMesh(r.builtin(ee::render::Prim::Cube), pos, size, euler,
-                 ee::render::Color{0.85f, 0.20f, 0.20f});
+                 matFor({0.85f, 0.20f, 0.20f}));
     }
 
     if (cp) {
@@ -115,7 +133,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       float hgt = valueOf(cp->values, "height", 1.0f);
       float rr = rad * scx;
       float hh = hgt * scy;
-      ee::render::Color capCol{0.20f, 0.55f, 0.85f};
+      ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
 
       r.drawMesh(r.builtin(ee::render::Prim::Cylinder), pos,
                  ee::render::Vec3{rr, hh, rr}, euler, capCol);
@@ -138,9 +156,17 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
           cm.gpu = r.createMesh(cm.verts.data(), (int)cm.verts.size(),
                                 cm.idx.data(), (int)cm.idx.size());
         r.drawMesh(cm.gpu, pos, ee::render::Vec3{scx, scy, scz}, euler,
-                   ee::render::Color{0.80f, 0.80f, 0.85f});
+                   matFor({0.80f, 0.80f, 0.85f}));
       }
     }
+
+    if (editorOverlays && pointLight)
+      drawLightGizmo(r, pos, euler, false,
+                     valueOf(pointLight->values, "range", 10.0f),
+                     static_cast<int>(idx) == selected);
+    if (editorOverlays && dirLight)
+      drawLightGizmo(r, pos, euler, true, 0.0f,
+                     static_cast<int>(idx) == selected);
 
     if (cam && editorOverlays)
       drawCameraGizmo(r, pos, euler, static_cast<int>(idx) == selected);
@@ -316,5 +342,97 @@ void drawCameraGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
   r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
                  ee::render::Vec3{pos.x + off.x, pos.y + off.y, pos.z + off.z},
                  ee::render::Vec3{0.12f, 0.2f, 0.12f}, quatToEulerDeg(qLens), col);
+}
+} // namespace ee::systems
+
+namespace ee::systems {
+ee::render::Material colorMaterial(ee::render::Color albedo) {
+  ee::render::Material m;
+  m.albedo = albedo;
+  return m;
+}
+
+ee::render::Material renderMaterial(ee::render::IRenderer &r,
+                                    const ee::core::MaterialAsset &a) {
+  ee::render::Material m;
+  m.albedo = {a.albedo.r, a.albedo.g, a.albedo.b};
+  m.metallic = a.metallic;
+  m.roughness = a.roughness;
+  m.ao = a.ao;
+  m.emissive = {a.emissive.r, a.emissive.g, a.emissive.b};
+  m.emissiveIntensity = a.emissiveIntensity;
+  m.normalStrength = a.normalStrength;
+  m.tiling[0] = a.tiling[0];
+  m.tiling[1] = a.tiling[1];
+  m.offset[0] = a.offset[0];
+  m.offset[1] = a.offset[1];
+  for (int i = 0; i < ee::core::kMaterialMapCount; ++i) {
+    if (a.maps[i].empty())
+      continue;
+    // Couleur (albedo, emissive) en sRGB ; le reste = donnees lineaires.
+    bool srgb = i == static_cast<int>(ee::render::MapSlot::Albedo) ||
+                i == static_cast<int>(ee::render::MapSlot::Emissive);
+    m.maps[i] = r.loadTexture(ee::core::assetPath(a.maps[i]).string(), srgb);
+  }
+  return m;
+}
+
+ee::render::Lights sceneLights(const SceneInfo &scene) {
+  ee::render::Lights lights; // defaut : soleil + ambiance
+  const std::vector<ee::scene::Xform> world = ee::scene::sceneWorldXforms(scene);
+  bool anyLight = false, sunSet = false;
+  for (size_t i = 0; i < scene.entities.size(); ++i) {
+    if (!ee::scene::findTransform(scene.entities[i]))
+      continue;
+    for (const auto &ci : scene.entities[i].components) {
+      ee::Color3 c;
+      ee::fromHex(stringOf(ci.values, "color"), c);
+      ee::render::Color col{c.r, c.g, c.b};
+      if (ci.name == "DirectionalLightComponent" && !sunSet) {
+        ee::math::Vector3<float> f = world[i].rot.forward();
+        lights.sunDir = {f.x, f.y, f.z};
+        lights.sunColor = col;
+        lights.sunIntensity = valueOf(ci.values, "intensity", 2.5f);
+        sunSet = anyLight = true;
+      } else if (ci.name == "PointLightComponent") {
+        lights.points.push_back({{world[i].pos.x, world[i].pos.y, world[i].pos.z},
+                                 col,
+                                 valueOf(ci.values, "intensity", 5.0f),
+                                 valueOf(ci.values, "range", 10.0f)});
+        anyLight = true;
+      } else if (ci.name == "AmbientLightComponent") {
+        lights.ambient = col;
+        lights.ambientIntensity = valueOf(ci.values, "intensity", 0.25f);
+      }
+    }
+  }
+  // Des lumieres posees a la main : plus de soleil par defaut, sauf le leur.
+  if (anyLight && !sunSet)
+    lights.sun = false;
+  return lights;
+}
+
+void drawLightGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
+                    ee::render::Vec3 eulerDeg, bool directional, float range,
+                    bool selected) {
+  ee::render::Color col = selected ? ee::render::Color{1.0f, 0.9f, 0.1f}
+                                   : ee::render::Color{1.0f, 0.85f, 0.4f};
+  r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos,
+                 ee::render::Vec3{0.2f, 0.2f, 0.2f}, eulerDeg, col);
+  if (directional) {
+    // Fleche : un long cylindre fin dans la direction de la lumiere (-Z local).
+    ee::math::Quaternion q =
+        ee::math::Quaternion::fromEulerDeg(eulerDeg.x, eulerDeg.y, eulerDeg.z);
+    ee::math::Quaternion qRay = q * ee::math::Quaternion::fromEulerDeg(90.0f, 0.0f, 0.0f);
+    ee::math::Vector3<float> off = q.forward() * 0.7f;
+    r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
+                   ee::render::Vec3{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                   ee::render::Vec3{0.03f, 1.0f, 0.03f}, quatToEulerDeg(qRay), col);
+  } else if (selected && range > 0.0f) {
+    // Portee de l'ampoule.
+    r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos,
+                   ee::render::Vec3{range, range, range}, eulerDeg,
+                   ee::render::Color{1.0f, 0.85f, 0.4f});
+  }
 }
 } // namespace ee::systems

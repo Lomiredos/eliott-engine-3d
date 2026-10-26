@@ -256,6 +256,19 @@ namespace
         return rayBox(_ray, _center, _rot, Vec3{1.0f, 1.0f, 1.0f}, body, _outT);
     }
 
+    // Lumiere : petite sphere autour de son gizmo editeur (taille fixe).
+    bool rayLight(const ee::systems::Ray &_ray, const Vec3 &_center,
+                  const Quat &_rot, const Vec3 &, const ComponentInstance &, float &_outT)
+    {
+        static const ComponentInstance ball = []
+        {
+            ComponentInstance ci;
+            ci.values["radius"] = 0.3f;
+            return ci;
+        }();
+        return raySphere(_ray, _center, _rot, Vec3{1.0f, 1.0f, 1.0f}, ball, _outT);
+    }
+
     // -----------------------------------------------------------------------
     // LA TABLE DES FORMES : nom du composant -> comment le raycaster.
     // Pour ajouter une forme : ecrire sa fonction rayXxx ci-dessus, puis
@@ -269,6 +282,9 @@ namespace
             {"CapsuleComponent", &rayCapsule},
             {"MeshComponent", &rayMesh},
             {"CameraComponent", &rayCamera},
+            {"DirectionalLightComponent", &rayLight},
+            {"PointLightComponent", &rayLight},
+            {"AmbientLightComponent", &rayLight},
         };
         return reg;
     }

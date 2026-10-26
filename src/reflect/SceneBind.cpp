@@ -158,4 +158,17 @@ namespace ee::reflection
         }
         m_comp.values[_name] = index;
     }
+
+    void LoadVisitor::visit(const char *_name, ee::Color3 &_value)
+    {
+        auto it = m_comp.values.find(_name);
+        if (it != m_comp.values.end())
+            if (auto p = std::get_if<std::string>(&it->second))
+                ee::fromHex(*p, _value); // texte invalide : couleur inchangee
+    }
+
+    void SaveVisitor::visit(const char *_name, ee::Color3 &_value)
+    {
+        m_comp.values[_name] = ee::toHex(_value);
+    }
 }

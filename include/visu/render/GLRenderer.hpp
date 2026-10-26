@@ -2,6 +2,11 @@
 
 #include "visu/render/Renderer.hpp"
 
+#include <filesystem>
+
+#include <chrono>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace ee::render {
@@ -16,8 +21,11 @@ public:
   MeshHandle builtin(Prim which) override;
   MeshHandle createMesh(const float *verts, int vertFloatCount,
                         const unsigned int *indices, int indexCount) override;
+  using IRenderer::drawMesh; // garde le raccourci drawMesh(..., Color)
   void drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
-                Color col) override;
+                const Material &mat) override;
+  void setLights(const Lights &lights) override;
+  TextureHandle loadTexture(const std::string &path, bool srgb) override;
   void drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
                     Color col) override;
 
@@ -61,6 +69,22 @@ private:
   MeshHandle m_sphere = 0, m_cube = 0, m_cylinder = 0, m_hemisphere = 0;
 
   int m_uMVP = -1, m_uModel = -1, m_uColor = -1, m_uGlow = -1;
+  // Materiau + eclairage (shader PBR).
+  int m_uMetallic = -1, m_uRoughness = -1, m_uAO = -1, m_uEmissive = -1,
+      m_uEmissiveIntensity = -1, m_uNormalStrength = -1, m_uUVTransform = -1,
+      m_uMapMask = -1, m_uCamPos = -1, m_uAmbient = -1, m_uSunOn = -1,
+      m_uSunDir = -1, m_uSunColor = -1, m_uPointCount = -1, m_uPointPos = -1,
+      m_uPointColor = -1, m_uPointRange = -1;
+  void applyLights();
+  Lights m_lights;
+  float m_camPos[3] = {0.0f, 0.0f, 0.0f};
+
+  struct CachedTexture {
+    TextureHandle tex = 0;
+    std::filesystem::file_time_type mtime{};
+    std::chrono::steady_clock::time_point lastCheck{};
+  };
+  std::unordered_map<std::string, CachedTexture> m_textures; // cle : srgb|chemin
 
   struct Target {
     unsigned int fbo = 0, colorTex = 0, depthRbo = 0;

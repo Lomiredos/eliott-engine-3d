@@ -73,6 +73,11 @@ namespace ee::reflection
         fields.push_back(f);
     }
 
+    void CatalogVisitor::visit(const char *_name, ee::Color3 &_value)
+    {
+        fields.push_back(makeField(_name, "color", ee::toHex(_value)));
+    }
+
     void writeCatalog(const nlohmann::json &_components, const std::filesystem::path &_out)
     {
         nlohmann::json root;

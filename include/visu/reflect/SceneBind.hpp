@@ -28,6 +28,7 @@ namespace ee::reflection
         void visit(const char *_name, ee::math::Quaternion &_value) override;
         void visitEnum(const char *_name, int& _value, const char* const* _labels, int _count) override;
         void visitEntity(const char *_name, ee::EntityRef &_value, const char *_required) override;
+        void visit(const char *_name, ee::Color3 &_value) override;
 
     private:
         const ComponentInstance &m_comp;
@@ -51,6 +52,7 @@ namespace ee::reflection
         void visit(const char *_name, ee::math::Quaternion &_value) override;
         void visitEnum(const char *_name, int& _value, const char* const* _labels, int _count) override;
         void visitEntity(const char *_name, ee::EntityRef &_value, const char *_required) override;
+        void visit(const char *_name, ee::Color3 &_value) override;
 
     private:
         ComponentInstance &m_comp;

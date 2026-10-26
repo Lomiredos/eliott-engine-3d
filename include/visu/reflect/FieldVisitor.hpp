@@ -3,6 +3,7 @@
 #include "math/Vector3.hpp"
 #include "math/Quaternion.hpp"
 
+#include "visu/core/Color3.hpp"
 #include "visu/core/EntityRef.hpp"
 #include "visu/reflect/Reflect.hpp"
 
@@ -25,6 +26,8 @@ namespace ee::reflection
         virtual void visit(const char *_name, ee::math::Vector3<float> &_value) = 0;
         virtual void visit(const char *_name, ee::math::Quaternion &_value) = 0;
         virtual void visitEnum(const char *_name, int &_value, const char *const *_labels, int _count) = 0;
+        // Couleur : scene "#rrggbb", catalogue type "color".
+        virtual void visit(const char *_name, ee::Color3 &_value) = 0;
         // _required = nom du composant que l'entite visee doit avoir (nullptr = aucun).
         virtual void visitEntity(const char *_name, ee::EntityRef &_value, const char *_required) = 0;
 

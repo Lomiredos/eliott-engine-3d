@@ -8,3 +8,5 @@
 #include "visu/components/RigideBodyComponent.hpp"
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/CameraComponent.hpp"
+#include "visu/components/MaterialComponent.hpp"
+#include "visu/components/LightComponents.hpp"
