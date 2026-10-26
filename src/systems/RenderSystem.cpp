@@ -54,7 +54,7 @@ ee::render::Vec3 quatToEulerDeg(const ee::math::Quaternion &q) {
 
 namespace ee::systems {
 void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
-                 int selected) {
+                 int selected, bool editorOverlays) {
   for (std::size_t idx = 0; idx < scene.entities.size(); ++idx) {
     const EntityInfo &ent = scene.entities[idx];
     const ComponentInstance *tf = nullptr;
@@ -142,12 +142,12 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       }
     }
 
-    if (cam)
+    if (cam && editorOverlays)
       drawCameraGizmo(r, pos, euler, static_cast<int>(idx) == selected);
 
     // Contour du collider : seulement pour l'entite selectionnee, jamais en
     // permanence (c'est un aide visuel d'edition, pas du gameplay).
-    if (cc && static_cast<int>(idx) == selected) {
+    if (cc && editorOverlays && static_cast<int>(idx) == selected) {
       ColliderWireDesc col;
       col.shape = stringOf(cc->values, "Shape");
       col.offset = {valueOf(cc->values, "OffSetX", 0.0f),
@@ -249,31 +249,43 @@ ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
   return cam;
 }
 
+bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out) {
+  if (index < 0 || index >= static_cast<int>(scene.entities.size()))
+    return false;
+  const ComponentInstance *tf = nullptr;
+  const ComponentInstance *cam = nullptr;
+  for (const auto &ci : scene.entities[index].components) {
+    if (ci.name == "TransformComponent")
+      tf = &ci;
+    else if (ci.name == "CameraComponent")
+      cam = &ci;
+  }
+  if (!tf || !cam)
+    return false;
+  out = cameraFromTransform(
+      {valueOf(tf->values, "PositionX", 0.0f),
+       valueOf(tf->values, "PositionY", 0.0f),
+       valueOf(tf->values, "PositionZ", 0.0f)},
+      {valueOf(tf->values, "EuleurX", 0.0f), valueOf(tf->values, "EuleurY", 0.0f),
+       valueOf(tf->values, "EuleurZ", 0.0f)},
+      valueOf(cam->values, "fov", 45.0f), valueOf(cam->values, "nearZ", 0.1f),
+      valueOf(cam->values, "farZ", 200.0f));
+  return true;
+}
+
 bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out) {
   bool found = false;
-  for (const EntityInfo &ent : scene.entities) {
-    const ComponentInstance *tf = nullptr;
-    const ComponentInstance *cam = nullptr;
-    for (const auto &ci : ent.components) {
-      if (ci.name == "TransformComponent")
-        tf = &ci;
-      else if (ci.name == "CameraComponent")
-        cam = &ci;
-    }
-    if (!tf || !cam)
+  for (int i = 0; i < static_cast<int>(scene.entities.size()); ++i) {
+    ee::render::Camera c;
+    if (!entityCamera(scene, i, c))
       continue;
-    bool isMain = valueOf(cam->values, "isMain", 1.0f) != 0.0f;
+    bool isMain = true;
+    for (const auto &ci : scene.entities[i].components)
+      if (ci.name == "CameraComponent")
+        isMain = valueOf(ci.values, "isMain", 1.0f) != 0.0f;
     if (found && !isMain)
       continue;
-    out = cameraFromTransform(
-        {valueOf(tf->values, "PositionX", 0.0f),
-         valueOf(tf->values, "PositionY", 0.0f),
-         valueOf(tf->values, "PositionZ", 0.0f)},
-        {valueOf(tf->values, "EuleurX", 0.0f),
-         valueOf(tf->values, "EuleurY", 0.0f),
-         valueOf(tf->values, "EuleurZ", 0.0f)},
-        valueOf(cam->values, "fov", 45.0f), valueOf(cam->values, "nearZ", 0.1f),
-        valueOf(cam->values, "farZ", 200.0f));
+    out = c;
     found = true;
     if (isMain)
       return true;

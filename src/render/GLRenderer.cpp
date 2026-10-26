@@ -413,32 +413,42 @@ namespace ee::render
         return true;
     }
 
+    void GLRenderer::setTarget(int index)
+    {
+        if (index < 0)
+            index = 0;
+        if (index >= static_cast<int>(m_targets.size()))
+            m_targets.resize(index + 1);
+        m_target = index;
+    }
+
     void GLRenderer::ensureFbo(int w, int h)
     {
-        if (m_fbo != 0 && w == m_fboW && h == m_fboH)
+        Target &t = m_targets[m_target];
+        if (t.fbo != 0 && w == t.w && h == t.h)
             return;
 
-        if (m_fbo == 0)
+        if (t.fbo == 0)
         {
-            glGenFramebuffers(1, &m_fbo);
-            glGenTextures(1, &m_colorTex);
-            glGenRenderbuffers(1, &m_depthRbo);
+            glGenFramebuffers(1, &t.fbo);
+            glGenTextures(1, &t.colorTex);
+            glGenRenderbuffers(1, &t.depthRbo);
         }
 
-        m_fboW = w;
-        m_fboH = h;
+        t.w = w;
+        t.h = h;
 
-        glBindTexture(GL_TEXTURE_2D, m_colorTex);
+        glBindTexture(GL_TEXTURE_2D, t.colorTex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glBindRenderbuffer(GL_RENDERBUFFER, m_depthRbo);
+        glBindRenderbuffer(GL_RENDERBUFFER, t.depthRbo);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_colorTex, 0);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthRbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, t.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t.colorTex, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, t.depthRbo);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
@@ -470,7 +480,7 @@ namespace ee::render
         }
 
         // Onscreen : framebuffer 0 (la fenetre). Offscreen : notre FBO texture.
-        glBindFramebuffer(GL_FRAMEBUFFER, m_offscreen ? m_fbo : 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_offscreen ? m_targets[m_target].fbo : 0);
         glViewport(0, 0, width, height);
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.12f, 0.12f, 0.14f, 1.0f);

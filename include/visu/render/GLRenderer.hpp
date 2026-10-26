@@ -21,7 +21,12 @@ public:
 
   void setOffscreen(bool offscreen) { m_offscreen = offscreen; }
 
-  unsigned int texture() const { return m_colorTex; }
+  // Plusieurs images offscreen avec les memes meshes (ex. vue editeur + vue
+  // d'une camera) : chaque cible a son FBO ; beginScene/texture() utilisent
+  // la cible courante (0 par defaut).
+  void setTarget(int index);
+
+  unsigned int texture() const { return m_targets[m_target].colorTex; }
   void viewMatrix(float out[16]) const;
   void projMatrix(float out[16]) const;
 
@@ -55,8 +60,12 @@ private:
 
   int m_uMVP = -1, m_uModel = -1, m_uColor = -1, m_uGlow = -1;
 
-  unsigned int m_fbo = 0, m_colorTex = 0, m_depthRbo = 0;
-  int m_fboW = 0, m_fboH = 0;
+  struct Target {
+    unsigned int fbo = 0, colorTex = 0, depthRbo = 0;
+    int w = 0, h = 0;
+  };
+  std::vector<Target> m_targets = std::vector<Target>(1);
+  int m_target = 0;
 
   float m_view[16] = {0};
   float m_proj[16] = {0};

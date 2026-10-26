@@ -9,8 +9,10 @@
 namespace ee::systems {
 // selected = index de l'entite dont le collider doit etre affiche en fil de
 // fer (-1 = aucun contour de collider affiche).
+// editorOverlays = false : rendu "comme le jeu" (pas de gizmo camera ni de
+// contour de collider), ex. apercu de ce que voit une camera.
 void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
-                 int selected = -1);
+                 int selected = -1, bool editorOverlays = true);
 
 // Forme d'un collider, en valeurs simples : remplie depuis la scene (editeur)
 // ou depuis le ColliderComponent typé (jeu) -> meme contour des deux cotes.
@@ -38,6 +40,10 @@ ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
 // Camera du jeu decrite par la scene (entite CameraComponent + Transform).
 // false si la scene n'en a pas. Choix : premiere isMain, sinon premiere.
 bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out);
+
+// Camera d'une entite precise (index dans la scene). false si elle n'a pas
+// CameraComponent + TransformComponent.
+bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out);
 
 // Petite camera fil de fer (boitier + objectif vers -Z local) : rend visible
 // dans l'editeur une entite camera, qui n'a pas de forme a elle.
