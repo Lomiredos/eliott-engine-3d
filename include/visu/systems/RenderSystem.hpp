@@ -28,4 +28,19 @@ struct ColliderWireDesc {
 void drawColliderWire(ee::render::IRenderer &r, ee::render::Vec3 pos,
                       ee::render::Vec3 eulerDeg, ee::render::Vec3 scale,
                       const ColliderWireDesc &col);
+
+// Camera placee par un transform : position = pos, regarde vers le -Z local
+// tourne par eulerDeg (meme convention que les meshes ; roulis ignore).
+ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
+                                       ee::render::Vec3 eulerDeg, float fovDeg,
+                                       float nearZ, float farZ);
+
+// Camera du jeu decrite par la scene (entite CameraComponent + Transform).
+// false si la scene n'en a pas. Choix : premiere isMain, sinon premiere.
+bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out);
+
+// Petite camera fil de fer (boitier + objectif vers -Z local) : rend visible
+// dans l'editeur une entite camera, qui n'a pas de forme a elle.
+void drawCameraGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
+                     ee::render::Vec3 eulerDeg, bool selected);
 }

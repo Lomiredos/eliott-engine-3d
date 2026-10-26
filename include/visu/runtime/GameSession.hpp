@@ -68,7 +68,7 @@ namespace ee::runtime
         }
     }
 
-    // Camera fixe du jeu (en attendant un composant camera).
+    // Camera quand la scene n'a pas d'entite CameraComponent.
     inline ee::render::Camera defaultCamera()
     {
         ee::render::Camera cam;
@@ -139,6 +139,16 @@ namespace ee::runtime
             _r.beginScene(_cam, _w, _h);
             ee::scene::renderWorld(_r, m_world, m_entities, _selected);
             _r.endScene();
+        }
+
+        // Camera de la frame : entite CameraComponent (suit son transform,
+        // donc deplacable par un systeme), sinon defaultCamera().
+        ee::render::Camera camera()
+        {
+            ee::render::Camera cam;
+            if (ee::scene::worldCamera(m_world, m_entities, cam))
+                return cam;
+            return defaultCamera();
         }
 
         const Config &config() const { return m_cfg; }

@@ -262,7 +262,6 @@ namespace ee::runtime
             glfwSwapInterval(0);
 
             ee::render::GLRenderer renderer; // offscreen (FBO) par defaut
-            ee::render::Camera cam = defaultCamera();
 
             const double frameTime = 1.0 / 60.0; // pas de vsync sans fenetre visible
             double last = glfwGetTime();
@@ -285,7 +284,7 @@ namespace ee::runtime
 
                 int w = std::min(link.width() > 0 ? link.width() : _game.config().width, ee::ipc::SharedFrame::kMaxWidth);
                 int h = std::min(link.height() > 0 ? link.height() : _game.config().height, ee::ipc::SharedFrame::kMaxHeight);
-                _game.render(renderer, cam, w, h, link.selected());
+                _game.render(renderer, _game.camera(), w, h, link.selected());
                 if (renderer.texture() != 0)
                 {
                     glBindTexture(GL_TEXTURE_2D, renderer.texture());
@@ -343,7 +342,6 @@ namespace ee::runtime
 
         ee::render::GLRenderer renderer;
         renderer.setOffscreen(false);
-        ee::render::Camera cam = defaultCamera();
 
         // Boucle.
         double last = glfwGetTime();
@@ -362,7 +360,7 @@ namespace ee::runtime
 
             int w, h;
             glfwGetFramebufferSize(win, &w, &h);
-            game.render(renderer, cam, w, h);
+            game.render(renderer, game.camera(), w, h);
 
             glfwSwapBuffers(win);
         }

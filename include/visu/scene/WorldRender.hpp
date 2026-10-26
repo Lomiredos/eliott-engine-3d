@@ -20,6 +20,7 @@
 #include "visu/components/CapsuleComponent.hpp"
 #include "visu/components/MeshComponent.hpp"
 #include "visu/components/ColliderComponent.hpp"
+#include "visu/components/CameraComponent.hpp"
 #include "visu/systems/RenderSystem.hpp" // drawColliderWire
 
 #include "math/Quaternion.hpp"
@@ -108,5 +109,29 @@ namespace ee::scene
                 ee::systems::drawColliderWire(_r, pos, euler, {scx, scy, scz}, col);
             }
         }
+    }
+
+    // Camera du jeu depuis le World (CameraComponent + Transform), meme choix
+    // que sceneCamera : premiere isMain, sinon premiere. false si aucune.
+    inline bool worldCamera(ee::ecs::World &_w, const std::vector<ee::ecs::EntityID> &_ents,
+                            ee::render::Camera &_out)
+    {
+        bool found = false;
+        for (ee::ecs::EntityID e : _ents)
+        {
+            if (!_w.hasComponent<CameraComponent>(e) || !_w.hasComponent<TransformComponent>(e))
+                continue;
+            const CameraComponent &c = *_w.getComponent<CameraComponent>(e);
+            if (found && !c.isMain)
+                continue;
+            const TransformComponent &t = *_w.getComponent<TransformComponent>(e);
+            _out = ee::systems::cameraFromTransform({t.position.x, t.position.y, t.position.z},
+                                                    {t.euler.x, t.euler.y, t.euler.z},
+                                                    c.fov, c.nearZ, c.farZ);
+            found = true;
+            if (c.isMain)
+                return true;
+        }
+        return found;
     }
 }

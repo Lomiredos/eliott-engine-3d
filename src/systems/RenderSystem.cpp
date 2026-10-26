@@ -63,6 +63,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     const ComponentInstance *cp = nullptr;
     const ComponentInstance *mp = nullptr;
     const ComponentInstance *cc = nullptr;
+    const ComponentInstance *cam = nullptr;
     for (const auto &ci : ent.components) {
       if (ci.name == "TransformComponent")
         tf = &ci;
@@ -76,6 +77,8 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
         mp = &ci;
       else if (ci.name == "ColliderComponent")
         cc = &ci;
+      else if (ci.name == "CameraComponent")
+        cam = &ci;
     }
     if (!tf)
       continue;
@@ -138,6 +141,9 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
                    ee::render::Color{0.80f, 0.80f, 0.85f});
       }
     }
+
+    if (cam)
+      drawCameraGizmo(r, pos, euler, static_cast<int>(idx) == selected);
 
     // Contour du collider : seulement pour l'entite selectionnee, jamais en
     // permanence (c'est un aide visuel d'edition, pas du gameplay).
@@ -221,5 +227,75 @@ void drawColliderWire(ee::render::IRenderer &r, ee::render::Vec3 pos,
     r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), cpos, radii, ceuler,
                    wireCol);
   }
+}
+} // namespace ee::systems
+
+namespace ee::systems {
+ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
+                                       ee::render::Vec3 eulerDeg, float fovDeg,
+                                       float nearZ, float farZ) {
+  ee::math::Quaternion q =
+      ee::math::Quaternion::fromEulerDeg(eulerDeg.x, eulerDeg.y, eulerDeg.z);
+  ee::math::Vector3<float> f = q.forward(); // -Z local
+  float fy = f.y < -1.0f ? -1.0f : (f.y > 1.0f ? 1.0f : f.y);
+
+  ee::render::Camera cam;
+  cam.pos = pos;
+  cam.yaw = std::atan2(f.z, f.x); // convention Camera : avant = (cos, ., sin)
+  cam.pitch = std::asin(fy);
+  cam.fovDeg = fovDeg;
+  cam.nearZ = nearZ;
+  cam.farZ = farZ;
+  return cam;
+}
+
+bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out) {
+  bool found = false;
+  for (const EntityInfo &ent : scene.entities) {
+    const ComponentInstance *tf = nullptr;
+    const ComponentInstance *cam = nullptr;
+    for (const auto &ci : ent.components) {
+      if (ci.name == "TransformComponent")
+        tf = &ci;
+      else if (ci.name == "CameraComponent")
+        cam = &ci;
+    }
+    if (!tf || !cam)
+      continue;
+    bool isMain = valueOf(cam->values, "isMain", 1.0f) != 0.0f;
+    if (found && !isMain)
+      continue;
+    out = cameraFromTransform(
+        {valueOf(tf->values, "PositionX", 0.0f),
+         valueOf(tf->values, "PositionY", 0.0f),
+         valueOf(tf->values, "PositionZ", 0.0f)},
+        {valueOf(tf->values, "EuleurX", 0.0f),
+         valueOf(tf->values, "EuleurY", 0.0f),
+         valueOf(tf->values, "EuleurZ", 0.0f)},
+        valueOf(cam->values, "fov", 45.0f), valueOf(cam->values, "nearZ", 0.1f),
+        valueOf(cam->values, "farZ", 200.0f));
+    found = true;
+    if (isMain)
+      return true;
+  }
+  return found;
+}
+
+void drawCameraGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,
+                     ee::render::Vec3 eulerDeg, bool selected) {
+  ee::render::Color col = selected ? ee::render::Color{1.0f, 0.9f, 0.1f}
+                                   : ee::render::Color{0.55f, 0.75f, 1.0f};
+  // Boitier, centre sur l'entite.
+  r.drawWireMesh(r.builtin(ee::render::Prim::Cube), pos,
+                 ee::render::Vec3{0.4f, 0.3f, 0.5f}, eulerDeg, col);
+
+  // Objectif : cylindre (axe Y) couche le long du -Z local, devant le boitier.
+  ee::math::Quaternion q =
+      ee::math::Quaternion::fromEulerDeg(eulerDeg.x, eulerDeg.y, eulerDeg.z);
+  ee::math::Quaternion qLens = q * ee::math::Quaternion::fromEulerDeg(90.0f, 0.0f, 0.0f);
+  ee::math::Vector3<float> off = q.forward() * 0.35f;
+  r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
+                 ee::render::Vec3{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                 ee::render::Vec3{0.12f, 0.2f, 0.12f}, quatToEulerDeg(qLens), col);
 }
 } // namespace ee::systems

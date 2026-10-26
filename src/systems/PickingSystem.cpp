@@ -239,6 +239,22 @@ namespace
         return false;
     }
 
+    // Camera : pas de forme propre -> la boite de son gizmo editeur (taille
+    // fixe, independante du scale de l'entite).
+    bool rayCamera(const ee::systems::Ray &_ray, const Vec3 &_center,
+                   const Quat &_rot, const Vec3 &, const ComponentInstance &, float &_outT)
+    {
+        static const ComponentInstance body = []
+        {
+            ComponentInstance ci;
+            ci.values["sizeX"] = 0.5f;
+            ci.values["sizeY"] = 0.4f;
+            ci.values["sizeZ"] = 0.8f;
+            return ci;
+        }();
+        return rayBox(_ray, _center, _rot, Vec3{1.0f, 1.0f, 1.0f}, body, _outT);
+    }
+
     // -----------------------------------------------------------------------
     // LA TABLE DES FORMES : nom du composant -> comment le raycaster.
     // Pour ajouter une forme : ecrire sa fonction rayXxx ci-dessus, puis
@@ -251,6 +267,7 @@ namespace
             {"RectComponent", &rayBox},
             {"CapsuleComponent", &rayCapsule},
             {"MeshComponent", &rayMesh},
+            {"CameraComponent", &rayCamera},
         };
         return reg;
     }

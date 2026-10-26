@@ -7,3 +7,4 @@
 #include "visu/components/MeshComponent.hpp"
 #include "visu/components/RigideBodyComponent.hpp"
 #include "visu/components/ColliderComponent.hpp"
+#include "visu/components/CameraComponent.hpp"
