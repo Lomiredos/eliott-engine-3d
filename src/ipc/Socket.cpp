@@ -39,6 +39,8 @@ namespace
         (void)s_done;
     }
     bool wouldBlock() { return WSAGetLastError() == WSAEWOULDBLOCK; }
+    // Pas d'heritage par les process enfants (le jeu lance par l'editeur).
+    void noInherit(Native _s) { SetHandleInformation(reinterpret_cast<HANDLE>(_s), HANDLE_FLAG_INHERIT, 0); }
     void closeNative(Native _s) { closesocket(_s); }
     void setNonBlocking(Native _s)
     {
@@ -52,6 +54,8 @@ namespace
 
     void ensureWinsock() {}
     bool wouldBlock() { return errno == EAGAIN || errno == EWOULDBLOCK; }
+    // Pas d'heritage par les process enfants (le jeu lance par l'editeur).
+    void noInherit(Native _s) { fcntl(_s, F_SETFD, fcntl(_s, F_GETFD) | FD_CLOEXEC); }
     void closeNative(Native _s) { ::close(_s); }
     void setNonBlocking(Native _s) { fcntl(_s, F_SETFL, fcntl(_s, F_GETFL, 0) | O_NONBLOCK); }
     const int kSendFlags = MSG_NOSIGNAL; // pas de SIGPIPE si l'autre cote est parti
@@ -102,6 +106,7 @@ namespace ee::ipc
         Native s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (s == kNativeInvalid)
             return {};
+        noInherit(s);
 
         sockaddr_in addr = loopback(0); // port 0 : le systeme en choisit un libre
         if (::bind(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0 ||
@@ -124,6 +129,7 @@ namespace ee::ipc
         Native s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (s == kNativeInvalid)
             return {};
+        noInherit(s);
 
         sockaddr_in addr = loopback(_port);
         if (::connect(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0)
@@ -143,6 +149,7 @@ namespace ee::ipc
         Native c = ::accept(static_cast<Native>(m_handle), nullptr, nullptr);
         if (c == kNativeInvalid)
             return {}; // rien en attente (ou erreur : on reessaiera)
+        noInherit(c);
         noDelay(c);
         setNonBlocking(c);
         return Socket(static_cast<Handle>(c));
