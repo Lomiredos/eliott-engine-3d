@@ -276,24 +276,30 @@ bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out) {
   return true;
 }
 
-bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out) {
-  bool found = false;
+std::vector<SceneCamera> sceneCameras(const SceneInfo &scene) {
+  std::vector<SceneCamera> active, first;
   for (int i = 0; i < static_cast<int>(scene.entities.size()); ++i) {
-    ee::render::Camera c;
-    if (!entityCamera(scene, i, c))
+    SceneCamera sc{i, {}};
+    if (!entityCamera(scene, i, sc.cam))
       continue;
     bool isMain = true;
     for (const auto &ci : scene.entities[i].components)
       if (ci.name == "CameraComponent")
         isMain = valueOf(ci.values, "isMain", 1.0f) != 0.0f;
-    if (found && !isMain)
-      continue;
-    out = c;
-    found = true;
     if (isMain)
-      return true;
+      active.push_back(sc);
+    else if (first.empty())
+      first.push_back(sc);
   }
-  return found;
+  return active.empty() ? first : active;
+}
+
+bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out) {
+  std::vector<SceneCamera> cams = sceneCameras(scene);
+  if (cams.empty())
+    return false;
+  out = cams.front().cam;
+  return true;
 }
 
 void drawCameraGizmo(ee::render::IRenderer &r, ee::render::Vec3 pos,

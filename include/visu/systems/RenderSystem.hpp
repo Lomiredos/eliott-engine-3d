@@ -5,6 +5,7 @@
 #include "visu/render/Renderer.hpp"
 
 #include <string>
+#include <vector>
 
 namespace ee::systems {
 // selected = index de l'entite dont le collider doit etre affiche en fil de
@@ -37,8 +38,16 @@ ee::render::Camera cameraFromTransform(ee::render::Vec3 pos,
                                        ee::render::Vec3 eulerDeg, float fovDeg,
                                        float nearZ, float farZ);
 
-// Camera du jeu decrite par la scene (entite CameraComponent + Transform).
-// false si la scene n'en a pas. Choix : premiere isMain, sinon premiere.
+// Cameras du jeu decrites par la scene (entites CameraComponent + Transform),
+// dans l'ordre de la scene = ordre des cases de l'ecran partage (voir
+// splitScreen). Toutes celles avec isMain ; si aucune, la premiere seule.
+struct SceneCamera {
+  int entity = -1;
+  ee::render::Camera cam;
+};
+std::vector<SceneCamera> sceneCameras(const SceneInfo &scene);
+
+// Premiere camera de sceneCameras. false si la scene n'en a pas.
 bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out);
 
 // Camera d'une entite precise (index dans la scene). false si elle n'a pas

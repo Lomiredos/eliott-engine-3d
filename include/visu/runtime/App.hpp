@@ -284,7 +284,7 @@ namespace ee::runtime
 
                 int w = std::min(link.width() > 0 ? link.width() : _game.config().width, ee::ipc::SharedFrame::kMaxWidth);
                 int h = std::min(link.height() > 0 ? link.height() : _game.config().height, ee::ipc::SharedFrame::kMaxHeight);
-                _game.render(renderer, _game.camera(), w, h, link.selected());
+                _game.render(renderer, w, h, link.selected());
                 if (renderer.texture() != 0)
                 {
                     glBindTexture(GL_TEXTURE_2D, renderer.texture());
@@ -360,7 +360,7 @@ namespace ee::runtime
 
             int w, h;
             glfwGetFramebufferSize(win, &w, &h);
-            game.render(renderer, game.camera(), w, h);
+            game.render(renderer, w, h);
 
             glfwSwapBuffers(win);
         }

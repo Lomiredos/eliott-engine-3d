@@ -18,6 +18,11 @@ struct Camera {
   float farZ = 200.0f;
 };
 
+// Zone de l'image, en pixels, origine en haut a gauche.
+struct Viewport {
+  int x = 0, y = 0, w = 0, h = 0;
+};
+
 using MeshHandle = unsigned int;
 
 // Hemisphere = demi-sphere unitaire bombee vers +Y (dome), pour les bouts
@@ -29,8 +34,15 @@ class IRenderer {
 public:
   virtual ~IRenderer() = default;
 
+  // Une seule camera sur toute l'image (= beginFrame + beginView plein ecran).
   virtual void beginScene(const Camera &cam, int width, int height) = 0;
   virtual void endScene() = 0;
+
+  // Plusieurs vues dans une image (ecran partage) : beginFrame remplit tout
+  // en noir, puis chaque beginView efface sa zone et y place sa camera ;
+  // les draw suivants vont dans cette zone. endScene une fois a la fin.
+  virtual void beginFrame(int width, int height) = 0;
+  virtual void beginView(const Camera &cam, const Viewport &view) = 0;
 
   virtual MeshHandle builtin(Prim which) = 0;
 

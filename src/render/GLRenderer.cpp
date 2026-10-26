@@ -454,6 +454,13 @@ namespace ee::render
 
     void GLRenderer::beginScene(const Camera &cam, int width, int height)
     {
+        beginFrame(width, height);
+        beginView(cam, Viewport{0, 0, width, height});
+    }
+
+    void GLRenderer::beginFrame(int width, int height)
+    {
+        m_frameOk = false;
         if (width <= 0 || height <= 0)
             return;
         if (!ensureInit())
@@ -461,15 +468,32 @@ namespace ee::render
 
         if (m_offscreen)
             ensureFbo(width, height);
+        m_frameW = width;
+        m_frameH = height;
+        m_frameOk = true;
 
-        // Matrices derivees de la camera-donnee.
+        // Onscreen : framebuffer 0 (la fenetre). Offscreen : notre FBO texture.
+        // Fond noir : ce qui reste hors des vues (cases vides de l'ecran partage).
+        glBindFramebuffer(GL_FRAMEBUFFER, m_offscreen ? m_targets[m_target].fbo : 0);
+        glViewport(0, 0, width, height);
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
+    void GLRenderer::beginView(const Camera &cam, const Viewport &v)
+    {
+        if (!m_frameOk || v.w <= 0 || v.h <= 0)
+            return;
+
+        // Matrices derivees de la camera-donnee (aspect = celui de la vue).
         float eye[3] = {cam.pos.x, cam.pos.y, cam.pos.z};
         float fwd[3];
         forwardFrom(cam.yaw, cam.pitch, fwd);
         float ctr[3] = {eye[0] + fwd[0], eye[1] + fwd[1], eye[2] + fwd[2]};
         float up[3] = {0.0f, 1.0f, 0.0f};
         Mat4 proj = perspective(cam.fovDeg * 3.14159265f / 180.0f,
-                                (float)width / (float)height, cam.nearZ, cam.farZ);
+                                (float)v.w / (float)v.h, cam.nearZ, cam.farZ);
         Mat4 view = lookAt(eye, ctr, up);
         Mat4 vp = mul(proj, view);
         for (int i = 0; i < 16; ++i)
@@ -479,12 +503,15 @@ namespace ee::render
             m_vp[i] = vp.m[i];
         }
 
-        // Onscreen : framebuffer 0 (la fenetre). Offscreen : notre FBO texture.
-        glBindFramebuffer(GL_FRAMEBUFFER, m_offscreen ? m_targets[m_target].fbo : 0);
-        glViewport(0, 0, width, height);
+        // GL compte y depuis le bas ; Viewport depuis le haut.
+        int glY = m_frameH - v.y - v.h;
+        glViewport(v.x, glY, v.w, v.h);
+        glEnable(GL_SCISSOR_TEST); // l'effacement ne deborde pas de la vue
+        glScissor(v.x, glY, v.w, v.h);
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_SCISSOR_TEST);
 
         glUseProgram(m_program);
         glUniform1f(m_uGlow, 0.0f); // chaque drawMesh bindera son propre VAO

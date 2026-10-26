@@ -11,6 +11,8 @@ public:
 
   void beginScene(const Camera &cam, int width, int height) override;
   void endScene() override;
+  void beginFrame(int width, int height) override;
+  void beginView(const Camera &cam, const Viewport &view) override;
   MeshHandle builtin(Prim which) override;
   MeshHandle createMesh(const float *verts, int vertFloatCount,
                         const unsigned int *indices, int indexCount) override;
@@ -66,6 +68,9 @@ private:
   };
   std::vector<Target> m_targets = std::vector<Target>(1);
   int m_target = 0;
+
+  int m_frameW = 0, m_frameH = 0; // image en cours (beginFrame)
+  bool m_frameOk = false;
 
   float m_view[16] = {0};
   float m_proj[16] = {0};

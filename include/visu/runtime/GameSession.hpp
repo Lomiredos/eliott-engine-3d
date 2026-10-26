@@ -14,6 +14,7 @@
 #include "visu/core/SceneInfo.hpp"
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
+#include "visu/render/SplitScreen.hpp"
 #include "visu/scene/WorldLoader.hpp"
 #include "visu/scene/SystemHost.hpp"
 #include "visu/scene/WorldRender.hpp"
@@ -132,23 +133,32 @@ namespace ee::runtime
             m_world.flush();
         }
 
+        // Une vue par camera (ecran partage, voir splitScreen) ; sans
+        // camera dans la scene, defaultCamera() en plein ecran.
         // _selected : index d'entite dont le collider est dessine (-1 = aucun).
-        void render(ee::render::IRenderer &_r, const ee::render::Camera &_cam, int _w, int _h,
-                    int _selected = -1)
+        void render(ee::render::IRenderer &_r, int _w, int _h, int _selected = -1)
         {
-            _r.beginScene(_cam, _w, _h);
-            ee::scene::renderWorld(_r, m_world, m_entities, _selected);
+            std::vector<ee::render::Camera> cams = cameras();
+            std::vector<ee::render::Viewport> views =
+                ee::render::splitScreen(static_cast<int>(cams.size()), _w, _h);
+
+            _r.beginFrame(_w, _h);
+            for (size_t i = 0; i < cams.size(); ++i)
+            {
+                _r.beginView(cams[i], views[i]);
+                ee::scene::renderWorld(_r, m_world, m_entities, _selected);
+            }
             _r.endScene();
         }
 
-        // Camera de la frame : entite CameraComponent (suit son transform,
-        // donc deplacable par un systeme), sinon defaultCamera().
-        ee::render::Camera camera()
+        // Cameras de la frame : entites CameraComponent (suivent leur
+        // transform, donc deplacables par un systeme), sinon defaultCamera().
+        std::vector<ee::render::Camera> cameras()
         {
-            ee::render::Camera cam;
-            if (ee::scene::worldCamera(m_world, m_entities, cam))
-                return cam;
-            return defaultCamera();
+            std::vector<ee::render::Camera> cams = ee::scene::worldCameras(m_world, m_entities);
+            if (cams.empty())
+                cams.push_back(defaultCamera());
+            return cams;
         }
 
         const Config &config() const { return m_cfg; }

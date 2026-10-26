@@ -111,27 +111,26 @@ namespace ee::scene
         }
     }
 
-    // Camera du jeu depuis le World (CameraComponent + Transform), meme choix
-    // que sceneCamera : premiere isMain, sinon premiere. false si aucune.
-    inline bool worldCamera(ee::ecs::World &_w, const std::vector<ee::ecs::EntityID> &_ents,
-                            ee::render::Camera &_out)
+    // Cameras du jeu depuis le World, meme regle et meme ordre que
+    // sceneCameras : toutes celles avec isMain, sinon la premiere seule.
+    inline std::vector<ee::render::Camera> worldCameras(ee::ecs::World &_w,
+                                                        const std::vector<ee::ecs::EntityID> &_ents)
     {
-        bool found = false;
+        std::vector<ee::render::Camera> active, first;
         for (ee::ecs::EntityID e : _ents)
         {
             if (!_w.hasComponent<CameraComponent>(e) || !_w.hasComponent<TransformComponent>(e))
                 continue;
             const CameraComponent &c = *_w.getComponent<CameraComponent>(e);
-            if (found && !c.isMain)
-                continue;
             const TransformComponent &t = *_w.getComponent<TransformComponent>(e);
-            _out = ee::systems::cameraFromTransform({t.position.x, t.position.y, t.position.z},
-                                                    {t.euler.x, t.euler.y, t.euler.z},
-                                                    c.fov, c.nearZ, c.farZ);
-            found = true;
+            ee::render::Camera cam = ee::systems::cameraFromTransform(
+                {t.position.x, t.position.y, t.position.z}, {t.euler.x, t.euler.y, t.euler.z},
+                c.fov, c.nearZ, c.farZ);
             if (c.isMain)
-                return true;
+                active.push_back(cam);
+            else if (first.empty())
+                first.push_back(cam);
         }
-        return found;
+        return active.empty() ? first : active;
     }
 }
