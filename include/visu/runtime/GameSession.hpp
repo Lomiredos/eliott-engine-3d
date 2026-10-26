@@ -132,10 +132,12 @@ namespace ee::runtime
             m_world.flush();
         }
 
-        void render(ee::render::IRenderer &_r, const ee::render::Camera &_cam, int _w, int _h)
+        // _selected : index d'entite dont le collider est dessine (-1 = aucun).
+        void render(ee::render::IRenderer &_r, const ee::render::Camera &_cam, int _w, int _h,
+                    int _selected = -1)
         {
             _r.beginScene(_cam, _w, _h);
-            ee::scene::renderWorld(_r, m_world, m_entities);
+            ee::scene::renderWorld(_r, m_world, m_entities, _selected);
             _r.endScene();
         }
 

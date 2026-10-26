@@ -19,6 +19,8 @@
 #include "visu/components/RectComponent.hpp"
 #include "visu/components/CapsuleComponent.hpp"
 #include "visu/components/MeshComponent.hpp"
+#include "visu/components/ColliderComponent.hpp"
+#include "visu/systems/RenderSystem.hpp" // drawColliderWire
 
 #include "math/Quaternion.hpp"
 
@@ -26,11 +28,15 @@
 
 namespace ee::scene
 {
+    // _selected = index (dans _ents) de l'entite dont le collider est dessine
+    // en fil de fer, -1 = aucun (aide de debug du Play dans l'editeur).
     inline void renderWorld(ee::render::IRenderer &_r, ee::ecs::World &_w,
-                            const std::vector<ee::ecs::EntityID> &_ents)
+                            const std::vector<ee::ecs::EntityID> &_ents,
+                            int _selected = -1)
     {
-        for (ee::ecs::EntityID e : _ents)
+        for (size_t idx = 0; idx < _ents.size(); ++idx)
         {
+            ee::ecs::EntityID e = _ents[idx];
             if (!_w.hasComponent<TransformComponent>(e))
                 continue;
 
@@ -85,6 +91,21 @@ namespace ee::scene
                     _r.drawMesh(cm.gpu, pos, ee::render::Vec3{scx, scy, scz}, euler,
                                 ee::render::Color{0.80f, 0.80f, 0.85f});
                 }
+            }
+
+            if (static_cast<int>(idx) == _selected && _w.hasComponent<ColliderComponent>(e))
+            {
+                const ColliderComponent &cc = *_w.getComponent<ColliderComponent>(e);
+                ee::systems::ColliderWireDesc col;
+                int shape = static_cast<int>(cc.shape);
+                if (shape >= 0 && shape < EnumNames<ColliderShape>::count)
+                    col.shape = EnumNames<ColliderShape>::values[shape];
+                col.offset = {cc.offset.x, cc.offset.y, cc.offset.z};
+                col.euler = {cc.euler.x, cc.euler.y, cc.euler.z};
+                col.radius = cc.radius;
+                col.halfExtents = {cc.halfExtents.x, cc.halfExtents.y, cc.halfExtents.z};
+                col.height = cc.height;
+                ee::systems::drawColliderWire(_r, pos, euler, {scx, scy, scz}, col);
             }
         }
     }

@@ -142,70 +142,84 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     // Contour du collider : seulement pour l'entite selectionnee, jamais en
     // permanence (c'est un aide visuel d'edition, pas du gameplay).
     if (cc && static_cast<int>(idx) == selected) {
-      std::string shape = stringOf(cc->values, "Shape");
-
-      // Offset et rotation locaux du collider, dans le repere de l'entite :
-      // l'offset est mis a l'echelle puis tourne par la rotation du
-      // TransformComponent ; la rotation du collider se compose APRES celle
-      // du transform (qWorld = qTf * qCol).
-      ee::math::Vector3<float> offLocal{
-          valueOf(cc->values, "OffSetX", 0.0f) * scx,
-          valueOf(cc->values, "OffSetY", 0.0f) * scy,
-          valueOf(cc->values, "OffSetZ", 0.0f) * scz};
-
-      ee::math::Quaternion qTf =
-          ee::math::Quaternion::fromEulerDeg(euler.x, euler.y, euler.z);
-      ee::math::Quaternion qCol = ee::math::Quaternion::fromEulerDeg(
-          valueOf(cc->values, "EulerX", 0.0f),
-          valueOf(cc->values, "EulerY", 0.0f),
-          valueOf(cc->values, "EulerZ", 0.0f));
-      ee::math::Quaternion qWorld = qTf * qCol;
-
-      ee::math::Vector3<float> offWorld = qTf.rotate(offLocal);
-      ee::render::Vec3 cpos{pos.x + offWorld.x, pos.y + offWorld.y,
-                            pos.z + offWorld.z};
-      ee::render::Vec3 ceuler = quatToEulerDeg(qWorld);
-      ee::render::Color wireCol{1.0f, 0.9f, 0.1f};
-
-      if (shape == "Box") {
-        ee::render::Vec3 size{
-            valueOf(cc->values, "HalfExtentsX", 0.5f) * 2.0f * scx,
-            valueOf(cc->values, "HalfExtentsY", 0.5f) * 2.0f * scy,
-            valueOf(cc->values, "HalfExtentsZ", 0.5f) * 2.0f * scz};
-        r.drawWireMesh(r.builtin(ee::render::Prim::Cube), cpos, size, ceuler,
-                      wireCol);
-      } else if (shape == "Capsule") {
-        float rr = valueOf(cc->values, "radius", 1.0f) * scx;
-        float hh = valueOf(cc->values, "Height", 2.0f) * scy;
-        r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder), cpos,
-                      ee::render::Vec3{rr, hh, rr}, ceuler, wireCol);
-
-        ee::math::Vector3<float> capOff =
-            qWorld.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-        ee::render::Vec3 top{cpos.x + capOff.x, cpos.y + capOff.y,
-                             cpos.z + capOff.z};
-        ee::render::Vec3 bot{cpos.x - capOff.x, cpos.y - capOff.y,
-                             cpos.z - capOff.z};
-        ee::render::Vec3 sphR{rr, rr, rr};
-
-        // Le dome (Hemisphere) est bombe vers +Y en local : correct tel
-        // quel pour le bout du haut, il faut le retourner (180 deg sur X,
-        // APRES le monde) pour qu'il bombe vers -Y pour le bout du bas.
-        ee::math::Quaternion qFlip = ee::math::Quaternion::fromAxisAngle(
-            {1.0f, 0.0f, 0.0f}, 3.14159265358979323846f);
-        ee::render::Vec3 botEuler = quatToEulerDeg(qWorld * qFlip);
-
-        r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), top, sphR,
-                      ceuler, wireCol);
-        r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), bot, sphR,
-                      botEuler, wireCol);
-      } else { // "Sphere" par defaut
-        float rr = valueOf(cc->values, "radius", 1.0f);
-        ee::render::Vec3 radii{rr * scx, rr * scy, rr * scz};
-        r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), cpos, radii,
-                      ceuler, wireCol);
-      }
+      ColliderWireDesc col;
+      col.shape = stringOf(cc->values, "Shape");
+      col.offset = {valueOf(cc->values, "OffSetX", 0.0f),
+                    valueOf(cc->values, "OffSetY", 0.0f),
+                    valueOf(cc->values, "OffSetZ", 0.0f)};
+      col.euler = {valueOf(cc->values, "EulerX", 0.0f),
+                   valueOf(cc->values, "EulerY", 0.0f),
+                   valueOf(cc->values, "EulerZ", 0.0f)};
+      col.radius = valueOf(cc->values, "radius", 1.0f);
+      col.halfExtents = {valueOf(cc->values, "HalfExtentsX", 0.5f),
+                         valueOf(cc->values, "HalfExtentsY", 0.5f),
+                         valueOf(cc->values, "HalfExtentsZ", 0.5f)};
+      col.height = valueOf(cc->values, "Height", 2.0f);
+      drawColliderWire(r, pos, euler, {scx, scy, scz}, col);
     }
+  }
+}
+
+void drawColliderWire(ee::render::IRenderer &r, ee::render::Vec3 pos,
+                      ee::render::Vec3 euler, ee::render::Vec3 scale,
+                      const ColliderWireDesc &col) {
+  const float scx = scale.x, scy = scale.y, scz = scale.z;
+
+  // Offset et rotation locaux du collider, dans le repere de l'entite :
+  // l'offset est mis a l'echelle puis tourne par la rotation du
+  // TransformComponent ; la rotation du collider se compose APRES celle
+  // du transform (qWorld = qTf * qCol).
+  ee::math::Vector3<float> offLocal{col.offset.x * scx, col.offset.y * scy,
+                                    col.offset.z * scz};
+
+  ee::math::Quaternion qTf =
+      ee::math::Quaternion::fromEulerDeg(euler.x, euler.y, euler.z);
+  ee::math::Quaternion qCol =
+      ee::math::Quaternion::fromEulerDeg(col.euler.x, col.euler.y, col.euler.z);
+  ee::math::Quaternion qWorld = qTf * qCol;
+
+  ee::math::Vector3<float> offWorld = qTf.rotate(offLocal);
+  ee::render::Vec3 cpos{pos.x + offWorld.x, pos.y + offWorld.y,
+                        pos.z + offWorld.z};
+  ee::render::Vec3 ceuler = quatToEulerDeg(qWorld);
+  ee::render::Color wireCol{1.0f, 0.9f, 0.1f};
+
+  if (col.shape == "Box") {
+    ee::render::Vec3 size{col.halfExtents.x * 2.0f * scx,
+                          col.halfExtents.y * 2.0f * scy,
+                          col.halfExtents.z * 2.0f * scz};
+    r.drawWireMesh(r.builtin(ee::render::Prim::Cube), cpos, size, ceuler,
+                   wireCol);
+  } else if (col.shape == "Capsule") {
+    float rr = col.radius * scx;
+    float hh = col.height * scy;
+    r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder), cpos,
+                   ee::render::Vec3{rr, hh, rr}, ceuler, wireCol);
+
+    ee::math::Vector3<float> capOff =
+        qWorld.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
+    ee::render::Vec3 top{cpos.x + capOff.x, cpos.y + capOff.y,
+                         cpos.z + capOff.z};
+    ee::render::Vec3 bot{cpos.x - capOff.x, cpos.y - capOff.y,
+                         cpos.z - capOff.z};
+    ee::render::Vec3 sphR{rr, rr, rr};
+
+    // Le dome (Hemisphere) est bombe vers +Y en local : correct tel
+    // quel pour le bout du haut, il faut le retourner (180 deg sur X,
+    // APRES le monde) pour qu'il bombe vers -Y pour le bout du bas.
+    ee::math::Quaternion qFlip = ee::math::Quaternion::fromAxisAngle(
+        {1.0f, 0.0f, 0.0f}, 3.14159265358979323846f);
+    ee::render::Vec3 botEuler = quatToEulerDeg(qWorld * qFlip);
+
+    r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), top, sphR, ceuler,
+                   wireCol);
+    r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), bot, sphR,
+                   botEuler, wireCol);
+  } else { // "Sphere" par defaut
+    ee::render::Vec3 radii{col.radius * scx, col.radius * scy,
+                           col.radius * scz};
+    r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), cpos, radii, ceuler,
+                   wireCol);
   }
 }
 } // namespace ee::systems

@@ -178,6 +178,10 @@ namespace ee::runtime
                     }
                     else if (t == "input")
                         m_input = ee::ipc::inputFromMsg(m);
+                    else if (t == "pause")
+                        m_paused = m.value("on", false);
+                    else if (t == "select")
+                        m_selected = m.value("e", -1);
                     else if (t == "set")
                         applySet(_game, m);
                 }
@@ -192,6 +196,8 @@ namespace ee::runtime
             }
 
             const ee::ipc::InputState &input() const { return m_input; }
+            bool paused() const { return m_paused; }
+            int selected() const { return m_selected; }
             int width() const { return m_width; }
             int height() const { return m_height; }
 
@@ -215,6 +221,8 @@ namespace ee::runtime
             ee::ipc::InputState m_input;
             int m_width = 0, m_height = 0;
             double m_lastSnapshot = -1.0;
+            bool m_paused = false;
+            int m_selected = -1;
         };
 
         // Mode preview : fenetre cachee (juste pour le contexte GL), rendu
@@ -267,12 +275,17 @@ namespace ee::runtime
 
                 float dt = static_cast<float>(start - last);
                 last = start;
-                applyRemoteInput(link.input());
-                _game.tick(dt);
+                if (link.paused())
+                    applyRemoteInput(ee::ipc::InputState{}); // en pause : plus aucun input
+                else
+                {
+                    applyRemoteInput(link.input());
+                    _game.tick(dt);
+                }
 
                 int w = std::min(link.width() > 0 ? link.width() : _game.config().width, ee::ipc::SharedFrame::kMaxWidth);
                 int h = std::min(link.height() > 0 ? link.height() : _game.config().height, ee::ipc::SharedFrame::kMaxHeight);
-                _game.render(renderer, cam, w, h);
+                _game.render(renderer, cam, w, h, link.selected());
                 if (renderer.texture() != 0)
                 {
                     glBindTexture(GL_TEXTURE_2D, renderer.texture());

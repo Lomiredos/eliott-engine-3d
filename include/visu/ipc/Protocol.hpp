@@ -4,7 +4,7 @@
 // Protocole du lien editeur <-> jeu (messages JSON sur ee::ipc::Socket).
 //
 // Chaque message a un champ "t" (son type) :
-//   editeur -> jeu : resize, input, set, stop
+//   editeur -> jeu : resize, input, set, pause, select, stop
 //   jeu -> editeur : ready, snap
 // Les images ne passent PAS par ici : voir SharedFrame.
 // ---------------------------------------------------------------------------
@@ -106,6 +106,13 @@ namespace ee::ipc
     {
         return {{"t", "set"}, {"e", _entity}, {"c", _comp}, {"f", _field}, {"v", fieldValueToJson(_value)}};
     }
+
+    // Pause : le jeu ne simule plus et n'ecoute plus les inputs, mais continue
+    // de s'afficher et d'accepter les modifications de champs.
+    inline nlohmann::json msgPause(bool _paused) { return {{"t", "pause"}, {"on", _paused}}; }
+
+    // Entite selectionnee dans l'editeur (son collider est dessine), -1 = aucune.
+    inline nlohmann::json msgSelect(int _entity) { return {{"t", "select"}, {"e", _entity}}; }
 
     inline nlohmann::json msgStop() { return {{"t", "stop"}}; }
 
