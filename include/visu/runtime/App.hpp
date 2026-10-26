@@ -302,22 +302,11 @@ namespace ee::runtime
             return 1;
         const Config &cfg = game.config();
 
-        // Lance par l'editeur ? (sinon : jeu autonome, comme toujours)
+        // Lance par l'editeur pour jouer dans sa preview ? Sinon (jeu seul, ou
+        // Play en fenetre separee) : la fenetre du jeu, sans lien.
         std::optional<ee::ipc::HostInfo> host = ee::ipc::parseHostInfo(std::getenv(ee::ipc::kEditorHostEnv));
         if (host && host->mode == ee::ipc::PlayMode::Preview)
             return detail::runEmbedded(game, *host);
-
-        // Mode fenetre separee lancee par l'editeur : meme boucle, plus le lien.
-        std::optional<detail::EditorLink> link;
-        if (host)
-        {
-            link.emplace();
-            if (!link->connect(host->port))
-            {
-                std::fprintf(stderr, "[runtime] connexion a l'editeur impossible (port %u)\n", host->port);
-                return 1;
-            }
-        }
 
         // Fenetre + contexte OpenGL 3.3 core.
         if (!glfwInit())
@@ -354,9 +343,6 @@ namespace ee::runtime
             double now = glfwGetTime();
             float dt = static_cast<float>(now - last);
             last = now;
-
-            if (link && !link->update(game, now))
-                break; // Stop demande par l'editeur (ou editeur ferme)
 
             detail::pollInput(win);
             game.tick(dt);
