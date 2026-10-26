@@ -10,15 +10,8 @@
 // touche jamais a main.
 // ---------------------------------------------------------------------------
 
-#include "ecs/World.hpp"
-
-#include "visu/core/SceneInfo.hpp"
-#include "visu/core/MeshStore.hpp"
+#include "visu/runtime/GameSession.hpp"
 #include "visu/render/GLRenderer.hpp"
-#include "visu/scene/WorldLoader.hpp"
-#include "visu/scene/SystemHost.hpp"
-#include "visu/scene/WorldRender.hpp"
-#include "visu/scene/EngineSystems.hpp"
 
 #include "input/InputManager.hpp"
 #include "input/Keys.hpp"
@@ -27,55 +20,12 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <cstdio>
-#include <filesystem>
-#include <functional>
-#include <optional>
-#include <string>
 #include <unordered_map>
-#include <vector>
-#include <algorithm>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 namespace ee::runtime
 {
-    struct Config
-    {
-        // Assets/ScenesDatas/, systems/, base des .obj. Laisse vide (defaut) :
-        // deduit automatiquement de l'emplacement de l'executable (convention
-        // <racine>/build/<exe>, celle qu'ecrit eliott-hub) -> marche quel que
-        // soit le dossier courant au lancement (terminal, double-clic, Play
-        // depuis l'editeur qui se place dans le dossier de l'exe...).
-        std::string projectRoot;
-        std::string sceneName = "BaseScene";  // Assets/ScenesDatas/<sceneName>.json
-        std::string windowTitle = "Game";
-        int width = 1000;
-        int height = 700;
-    };
-
-    // Callbacks fournis par le jeu (générés par l'editeur).
-    using RegisterComponentsFn = std::function<void(ee::scene::WorldRegistry &)>;
-    using RegisterSystemsFn = std::function<void(ee::scene::SystemHost &)>;
-
     namespace detail
     {
-        // Racine du projet deduite du chemin de l'executable (convention
-        // <racine>/build/<exe>), independante du dossier courant.
-        inline std::string defaultProjectRoot()
-        {
-#ifdef _WIN32
-            char buffer[MAX_PATH];
-            GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-            std::filesystem::path exe(buffer);
-#else
-            std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe");
-#endif
-            return exe.parent_path().parent_path().string(); // .../build/exe -> ...
-        }
-
         // Table GLFW <-> ee::input::Key, dans le MEME ORDRE que l'enum Key
         // (meme convention que s_keyTable cote SDL dans eliott-input).
         // La taille est deduite du tableau -> jamais de constante a resynchroniser
@@ -206,51 +156,12 @@ namespace ee::runtime
                    const RegisterComponentsFn &_registerComponents,
                    const RegisterSystemsFn &_registerSystems)
     {
-        Config cfg = _cfg;
-        if (cfg.projectRoot.empty())
-            cfg.projectRoot = detail::defaultProjectRoot();
-
-        // 1) Scene authoree.
-        std::string scenePath = cfg.projectRoot + "/Assets/ScenesDatas/" + cfg.sceneName + ".json";
-        std::optional<SceneInfo> scene = loadScene(scenePath);
-        if (!scene)
-        {
-            std::fprintf(stderr, "[runtime] scene introuvable : %s\n", scenePath.c_str());
+        GameSession game;
+        if (!game.load(_cfg, _registerComponents, _registerSystems))
             return 1;
-        }
-        ee::core::setMeshBaseDir(cfg.projectRoot);
+        const Config &cfg = game.config();
 
-        // 2) Composants connus (moteur + jeu).
-        ee::scene::WorldRegistry reg;
-        ee::scene::registerEngineComponents(reg);
-        if (_registerComponents)
-            _registerComponents(reg);
-
-        ee::ecs::World world;
-
-        // 3) Systemes AVANT le chargement (le flush les peuple).
-        std::vector<SystemInfo> schedule =
-            loadSystemsInDir(cfg.projectRoot + "/Systems");
-        std::vector<SystemInfo> engineSchedule =
-            ee::scene::engineSystemInfos();
-        schedule.insert(schedule.end(), engineSchedule.begin(), engineSchedule.end());
-        std::stable_sort(schedule.begin(), schedule.end(), [](const SystemInfo& _a, const SystemInfo& _b)
-        {return _a.priority < _b.priority;});
-        
-        ee::scene::SystemHost host;
-
-        ee::scene::registerEngineSystems(host);
-        if (_registerSystems)
-            _registerSystems(host);
-        host.build(world, reg, schedule);
-
-        // 4) Scene -> World typé.
-        std::vector<ee::ecs::EntityID> entities =
-            ee::scene::loadSceneIntoWorld(world, *scene, reg);
-        std::printf("[runtime] %zu entites, %zu systeme(s)\n", entities.size(), schedule.size());
-        std::fflush(stdout);
-
-        // 5) Fenetre + contexte OpenGL 3.3 core.
+        // Fenetre + contexte OpenGL 3.3 core.
         if (!glfwInit())
         {
             std::fprintf(stderr, "[runtime] glfwInit a echoue\n");
@@ -272,33 +183,26 @@ namespace ee::runtime
 
         ee::render::GLRenderer renderer;
         renderer.setOffscreen(false);
+        ee::render::Camera cam = defaultCamera();
 
-        ee::render::Camera cam;
-        cam.pos = {0.0f, 3.0f, 12.0f};
-        cam.yaw = -1.5707963f;
-        cam.pitch = -0.15f;
-
-        // 6) Boucle.
+        // Boucle.
+        double last = glfwGetTime();
         while (!glfwWindowShouldClose(win))
         {
             glfwPollEvents();
             if (glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                 glfwSetWindowShouldClose(win, 1);
 
-            static double last = glfwGetTime();
             double now = glfwGetTime();
             float dt = static_cast<float>(now - last);
             last = now;
 
             detail::pollInput(win);
-            host.updateAll(world, dt);
-            world.flush(); // commit des spawns/morts eventuels au runtime
+            game.tick(dt);
 
             int w, h;
             glfwGetFramebufferSize(win, &w, &h);
-            renderer.beginScene(cam, w, h);
-            ee::scene::renderWorld(renderer, world, entities);
-            renderer.endScene();
+            game.render(renderer, cam, w, h);
 
             glfwSwapBuffers(win);
         }
