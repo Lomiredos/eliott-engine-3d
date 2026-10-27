@@ -4,6 +4,7 @@
 #include "visu/render/Renderer.hpp"
 #include "visu/scene/Hierarchy.hpp"
 #include "visu/core/MaterialStore.hpp"
+#include "visu/core/EngineSettings.hpp"
 
 #include "math/Quaternion.hpp"
 
@@ -60,6 +61,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
                  int selected, bool editorOverlays) {
   // Transforms monde (hierarchie parent/enfant resolue).
   const std::vector<ee::scene::Xform> world = ee::scene::sceneWorldXforms(scene);
+  r.setSettings(ee::core::engineSettings().render);
   r.setLights(sceneLights(scene));
   for (std::size_t idx = 0; idx < scene.entities.size(); ++idx) {
     const EntityInfo &ent = scene.entities[idx];
@@ -395,12 +397,14 @@ ee::render::Lights sceneLights(const SceneInfo &scene) {
         lights.sunDir = {f.x, f.y, f.z};
         lights.sunColor = col;
         lights.sunIntensity = valueOf(ci.values, "intensity", 2.5f);
+        lights.sunShadows = valueOf(ci.values, "shadows", 1.0f) != 0.0f;
         sunSet = anyLight = true;
       } else if (ci.name == "PointLightComponent") {
         lights.points.push_back({{world[i].pos.x, world[i].pos.y, world[i].pos.z},
                                  col,
                                  valueOf(ci.values, "intensity", 5.0f),
-                                 valueOf(ci.values, "range", 10.0f)});
+                                 valueOf(ci.values, "range", 10.0f),
+                                 valueOf(ci.values, "shadows", 1.0f) != 0.0f});
         anyLight = true;
       } else if (ci.name == "AmbientLightComponent") {
         lights.ambient = col;

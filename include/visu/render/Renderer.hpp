@@ -66,6 +66,7 @@ struct PointLight {
   Color color;
   float intensity = 5.0f;
   float range = 10.0f; // au-dela, plus aucune lumiere
+  bool shadows = true;  // projette des ombres (voir RenderSettings)
 };
 
 // Eclairage d'une image (setLights). Par defaut : un soleil et une ambiance
@@ -77,9 +78,42 @@ struct Lights {
   Vec3 sunDir{-0.5f, -1.0f, -0.3f}; // direction dans laquelle va la lumiere
   Color sunColor{1.0f, 1.0f, 1.0f};
   float sunIntensity = 2.5f;
-  std::vector<PointLight> points; // au plus kMaxPointLights utilisees
+  bool sunShadows = true;
+  // Toutes celles de la scene : le renderer garde les maxPointLights les
+  // plus proches de la camera (RenderSettings).
+  std::vector<PointLight> points;
 };
-inline constexpr int kMaxPointLights = 8;
+
+// Reglages du rendu (Assets/EngineSettings.json du projet, onglet Reglages
+// de l'editeur). Valeurs hors bornes ramenees dans les bornes par setSettings.
+struct RenderSettings {
+  // Lampes ponctuelles prises en compte par image (les plus proches de la
+  // camera). Chacune coute un calcul par pixel. 1..64.
+  int maxPointLights = 8;
+
+  // Ombres du soleil : une shadow map couvrant sunShadowDistance devant la
+  // camera. Plus la distance est grande, plus les ombres sont floues.
+  bool sunShadows = true;
+  int sunShadowResolution = 2048; // 512..8192
+  float sunShadowDistance = 40.0f;
+
+  // Ombres des lampes : 6 rendus de la scene par lampe ombree (cher).
+  // Les maxShadowedPointLights lampes les plus proches en ont. 0..16.
+  bool pointShadows = true;
+  int maxShadowedPointLights = 4;
+  int pointShadowResolution = 512; // par face, 128..2048
+
+  // (pas de "= default" : l'editeur compile en C++17)
+  bool operator==(const RenderSettings &o) const {
+    return maxPointLights == o.maxPointLights && sunShadows == o.sunShadows &&
+           sunShadowResolution == o.sunShadowResolution &&
+           sunShadowDistance == o.sunShadowDistance &&
+           pointShadows == o.pointShadows &&
+           maxShadowedPointLights == o.maxShadowedPointLights &&
+           pointShadowResolution == o.pointShadowResolution;
+  }
+  bool operator!=(const RenderSettings &o) const { return !(*this == o); }
+};
 
 // Hemisphere = demi-sphere unitaire bombee vers +Y (dome), pour les bouts
 // d'une capsule : evite d'afficher une sphere complete qui chevaucherait
@@ -99,9 +133,14 @@ public:
   // les draw suivants vont dans cette zone. endScene une fois a la fin.
   virtual void beginFrame(int width, int height) = 0;
   virtual void beginView(const Camera &cam, const Viewport &view) = 0;
+  // Les draw d'une vue sont executes a sa fin (beginView suivant ou
+  // endScene) : ombres d'abord, puis opaques, fil de fer, transparents.
 
   // Eclairage des draw suivants (jusqu'au prochain setLights).
   virtual void setLights(const Lights &lights) = 0;
+
+  // Reglages (nombre de lampes, ombres). Sans effet s'ils n'ont pas change.
+  virtual void setSettings(const RenderSettings &settings) = 0;
 
   // Texture depuis un fichier image (png, jpg, tga, bmp...), mise en cache
   // et rechargee si le fichier change. srgb = couleur (albedo, emissive),

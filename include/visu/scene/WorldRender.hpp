@@ -24,6 +24,7 @@
 #include "visu/components/LightComponents.hpp"
 #include "visu/components/MaterialComponent.hpp"
 #include "visu/core/MaterialStore.hpp"
+#include "visu/core/EngineSettings.hpp"
 #include "visu/systems/RenderSystem.hpp" // drawColliderWire
 #include "visu/scene/Hierarchy.hpp"
 
@@ -49,6 +50,7 @@ namespace ee::scene
                 lights.sunDir = {f.x, f.y, f.z};
                 lights.sunColor = {l.color.r, l.color.g, l.color.b};
                 lights.sunIntensity = l.intensity;
+                lights.sunShadows = l.shadows;
                 sunSet = anyLight = true;
             }
             if (_w.hasComponent<PointLightComponent>(e))
@@ -58,7 +60,8 @@ namespace ee::scene
                 lights.points.push_back({{wx.pos.x, wx.pos.y, wx.pos.z},
                                          {l.color.r, l.color.g, l.color.b},
                                          l.intensity,
-                                         l.range});
+                                         l.range,
+                                         l.shadows});
                 anyLight = true;
             }
             if (_w.hasComponent<AmbientLightComponent>(e))
@@ -79,6 +82,7 @@ namespace ee::scene
                             const std::vector<ee::ecs::EntityID> &_ents,
                             int _selected = -1)
     {
+        _r.setSettings(ee::core::engineSettings().render);
         _r.setLights(worldLights(_w, _ents));
         for (size_t idx = 0; idx < _ents.size(); ++idx)
         {

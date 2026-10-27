@@ -46,6 +46,7 @@ add_library(ee-core STATIC
     src/core/SceneInfo.cpp
     src/core/MeshStore.cpp
     src/core/MaterialStore.cpp
+    src/core/EngineSettings.cpp
     src/core/SceneQuery.cpp
     src/core/SystemInfo.cpp
     src/render/GLRenderer.cpp

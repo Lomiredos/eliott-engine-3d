@@ -14,6 +14,7 @@ struct DirectionalLightComponent
 {
     ee::Color3 color{1.0f, 1.0f, 1.0f};
     float intensity = 2.5f;
+    bool shadows = true; // si active dans les Reglages du projet
 };
 
 // Ampoule : eclaire autour de sa position, jusqu'a range.
@@ -22,6 +23,7 @@ struct PointLightComponent
     ee::Color3 color{1.0f, 1.0f, 1.0f};
     float intensity = 5.0f;
     float range = 10.0f;
+    bool shadows = true; // les plus proches seulement (Reglages du projet)
 };
 
 // Lumiere ambiante : eclairage minimal partout (une seule utilisee).
@@ -39,6 +41,7 @@ struct ee::reflection::Reflect<DirectionalLightComponent>
     {
         _v.visit("color", _c.color);
         _v.visit("intensity", _c.intensity);
+        _v.visit("shadows", _c.shadows);
     }
 };
 
@@ -51,6 +54,7 @@ struct ee::reflection::Reflect<PointLightComponent>
         _v.visit("color", _c.color);
         _v.visit("intensity", _c.intensity);
         _v.visit("range", _c.range);
+        _v.visit("shadows", _c.shadows);
     }
 };
 

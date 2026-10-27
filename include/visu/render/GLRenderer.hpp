@@ -25,6 +25,7 @@ public:
   void drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
                 const Material &mat) override;
   void setLights(const Lights &lights) override;
+  void setSettings(const RenderSettings &settings) override;
   TextureHandle loadTexture(const std::string &path, bool srgb) override;
   void drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
                     Color col) override;
@@ -43,6 +44,8 @@ public:
 private:
   bool ensureInit();
   void ensureFbo(int w, int h);
+  // (Re)compile le shader principal pour m_settings.maxPointLights lampes.
+  bool buildProgram();
 
   MeshHandle uploadMesh(const float *verts, int vertFloatCount,
                         const unsigned int *idx, int idxCount);
@@ -57,17 +60,34 @@ private:
   // -1 = avant seules (transparents).
   void drawMeshNow(MeshHandle mesh, const float model[16], const Material &mat,
                    int faceSide);
+  void drawWireNow(MeshHandle mesh, const float model[16], Color col);
 
-  // Transparents de la vue en cours, dessines a la fin (beginView suivant,
-  // endScene) apres les opaques, tries du plus loin au plus proche.
-  struct Transparent {
+  // Draw de la vue en cours, executes par flushView (beginView suivant,
+  // endScene) : il faut tous les objets avant l'eclairage pour les ombres.
+  enum class DrawKind { Opaque, Wire, Transparent };
+  struct Queued {
+    DrawKind kind = DrawKind::Opaque;
     MeshHandle mesh = 0;
     float model[16];
-    Material mat;
-    float dist2 = 0.0f; // distance^2 a la camera
+    Material mat;          // Wire : couleur dans mat.albedo
+    float pos[3] = {};     // centre monde
+    float radius = 0.0f;   // rayon englobant monde (tri des ombres de lampe)
+    float dist2 = 0.0f;    // distance^2 a la camera (tri des transparents)
   };
-  std::vector<Transparent> m_transparent;
-  void flushTransparent();
+  std::vector<Queued> m_queue;
+  void flushView();
+
+  // Ombres : passe de profondeur depuis le soleil / chaque face des lampes.
+  void renderSunShadow(float outVP[16]);
+  void renderPointShadows(const std::vector<int> &rows);
+  void drawDepth(const Queued &q, const float vp[16]);
+  void ensureShadowTargets();
+
+  // Lampes de la vue : les maxPointLights les plus proches de la camera, et
+  // la ligne de l'atlas d'ombres de chacune (-1 = pas d'ombre).
+  std::vector<PointLight> m_activePoints;
+  std::vector<int> m_activeRows;
+  void selectPointLights();
 
   bool m_init = false;
   bool m_failed = false;
@@ -80,6 +100,7 @@ private:
     int indexCount = 0;
     unsigned int wireEbo = 0; // 0 = pas de variante fil de fer dediee
     int wireIndexCount = 0;
+    float radius = 1.0f; // sommet le plus loin de l'origine (mesh local)
   };
   std::vector<Mesh> m_meshes;
   MeshHandle m_sphere = 0, m_cube = 0, m_cylinder = 0, m_hemisphere = 0;
@@ -91,10 +112,25 @@ private:
       m_uMapMask = -1, m_uCamPos = -1, m_uAmbient = -1, m_uSunOn = -1,
       m_uSunDir = -1, m_uSunColor = -1, m_uPointCount = -1, m_uPointPos = -1,
       m_uPointColor = -1, m_uPointRange = -1, m_uTransparent = -1,
-      m_uOpacity = -1, m_uFaceSide = -1;
-  void applyLights();
+      m_uOpacity = -1, m_uFaceSide = -1, m_uSunShadowOn = -1, m_uSunVP = -1,
+      m_uSunTexel = -1, m_uSunNormalBias = -1, m_uPointShadowRow = -1,
+      m_uPointShadowTile = -1, m_uPointShadowTexel = -1, m_uPointNear = -1;
+  void applyLights(bool sunShadow, const float sunVP[16], float sunTexelWorld);
   Lights m_lights;
+  RenderSettings m_settings;
+  int m_programMaxPoints = 0; // maxPointLights du shader compile
   float m_camPos[3] = {0.0f, 0.0f, 0.0f};
+  float m_camFwd[3] = {0.0f, 0.0f, -1.0f};
+  int m_viewGL[4] = {0, 0, 0, 0}; // viewport GL de la vue en cours
+  unsigned int m_frameFbo = 0;    // FBO de l'image en cours
+
+  // Passe de profondeur (ombres).
+  unsigned int m_depthProgram = 0;
+  int m_uDepthMVP = -1;
+  unsigned int m_sunFbo = 0, m_sunTex = 0;
+  int m_sunRes = 0;
+  unsigned int m_pointFbo = 0, m_pointTex = 0;
+  int m_pointTile = 0, m_pointRows = 0; // atlas : 6 faces x lignes
 
   struct CachedTexture {
     TextureHandle tex = 0;
