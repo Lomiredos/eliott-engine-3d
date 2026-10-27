@@ -54,6 +54,11 @@ struct Material {
   float tiling[2] = {1.0f, 1.0f}; // repetition des uv
   float offset[2] = {0.0f, 0.0f};
   TextureHandle maps[static_cast<int>(MapSlot::Count)] = {};
+  // Transparent (verre, eau...) : dessine apres les opaques, du plus loin au
+  // plus proche. opacity = part du diffus gardee (x alpha de la map albedo) ;
+  // les reflets ne sont pas attenues.
+  bool transparent = false;
+  float opacity = 1.0f;
 };
 
 struct PointLight {

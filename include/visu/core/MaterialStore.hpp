@@ -14,11 +14,13 @@
 //     "albedo": "#ffffff", "metallic": 0.0, "roughness": 0.6, "ao": 1.0,
 //     "emissive": "#000000", "emissiveIntensity": 1.0, "normalStrength": 1.0,
 //     "tiling": [1, 1], "offset": [0, 0],
+//     "transparent": false, "opacity": 1.0,
 //     "maps": { "albedo": "Assets/Textures/brique_albedo.png", "normal": "...",
 //               "metallic": "", "roughness": "...", "ao": "...", "emissive": "" }
 //   }
 //
 // Chaque valeur multiplie sa map (ex. roughness 1 + map = la map telle quelle).
+// transparent : verre, eau... ; opacity multiplie l'alpha de la map albedo.
 // Chemins relatifs a la racine du projet (voir assetPath).
 // ---------------------------------------------------------------------------
 namespace ee::core
@@ -39,6 +41,8 @@ namespace ee::core
         float normalStrength = 1.0f;
         float tiling[2] = {1.0f, 1.0f};
         float offset[2] = {0.0f, 0.0f};
+        bool transparent = false;
+        float opacity = 1.0f; // utilisee seulement si transparent
         std::string maps[kMaterialMapCount]; // "" = pas de map
     };
 

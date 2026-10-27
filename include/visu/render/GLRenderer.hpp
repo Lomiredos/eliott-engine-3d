@@ -53,6 +53,22 @@ private:
   void attachWireIndices(MeshHandle mesh, const unsigned int *idx,
                          int idxCount);
 
+  // Dessin immediat. faceSide : 0 = toutes les faces, 1 = arriere seules,
+  // -1 = avant seules (transparents).
+  void drawMeshNow(MeshHandle mesh, const float model[16], const Material &mat,
+                   int faceSide);
+
+  // Transparents de la vue en cours, dessines a la fin (beginView suivant,
+  // endScene) apres les opaques, tries du plus loin au plus proche.
+  struct Transparent {
+    MeshHandle mesh = 0;
+    float model[16];
+    Material mat;
+    float dist2 = 0.0f; // distance^2 a la camera
+  };
+  std::vector<Transparent> m_transparent;
+  void flushTransparent();
+
   bool m_init = false;
   bool m_failed = false;
   bool m_offscreen = true;
@@ -74,7 +90,8 @@ private:
       m_uEmissiveIntensity = -1, m_uNormalStrength = -1, m_uUVTransform = -1,
       m_uMapMask = -1, m_uCamPos = -1, m_uAmbient = -1, m_uSunOn = -1,
       m_uSunDir = -1, m_uSunColor = -1, m_uPointCount = -1, m_uPointPos = -1,
-      m_uPointColor = -1, m_uPointRange = -1;
+      m_uPointColor = -1, m_uPointRange = -1, m_uTransparent = -1,
+      m_uOpacity = -1, m_uFaceSide = -1;
   void applyLights();
   Lights m_lights;
   float m_camPos[3] = {0.0f, 0.0f, 0.0f};

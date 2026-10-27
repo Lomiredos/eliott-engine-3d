@@ -23,6 +23,8 @@ namespace ee::core
         j["normalStrength"] = _m.normalStrength;
         j["tiling"] = {_m.tiling[0], _m.tiling[1]};
         j["offset"] = {_m.offset[0], _m.offset[1]};
+        j["transparent"] = _m.transparent;
+        j["opacity"] = _m.opacity;
         for (int i = 0; i < kMaterialMapCount; ++i)
             j["maps"][kMaterialMapNames[i]] = _m.maps[i];
         return j.dump(2) + "\n";
@@ -50,6 +52,8 @@ namespace ee::core
             if (j.contains("offset") && j["offset"].is_array() && j["offset"].size() == 2)
                 for (int k = 0; k < 2; ++k)
                     m.offset[k] = j["offset"][k].get<float>();
+            m.transparent = j.value("transparent", m.transparent);
+            m.opacity = j.value("opacity", m.opacity);
             if (j.contains("maps") && j["maps"].is_object())
                 for (int i = 0; i < kMaterialMapCount; ++i)
                     m.maps[i] = j["maps"].value(kMaterialMapNames[i], std::string());

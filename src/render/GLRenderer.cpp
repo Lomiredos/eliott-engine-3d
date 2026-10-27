@@ -198,6 +198,9 @@ uniform int uPointCount;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
 uniform float uPointRange[8];
+uniform int uTransparent; // 1 = blending premultiplie (verre...)
+uniform float uOpacity;   // part du diffus gardee ; les reflets restent entiers
+uniform int uFaceSide;    // 0 = toutes les faces, 1 = arriere seules, -1 = avant seules
 
 out vec4 FragColor;
 const float PI = 3.14159265;
@@ -217,21 +220,30 @@ float geometrySmith(float NdV, float NdL, float rough)
     return (NdV / (NdV * (1.0 - k) + k)) * (NdL / (NdL * (1.0 - k) + k));
 }
 
-// Lumiere recue d'une direction L (radiance deja attenuee).
-vec3 shade(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float metal, float rough)
+// Lumiere recue d'une direction L (radiance deja attenuee), ajoutee a part
+// en diffus et en reflet (un objet transparent n'attenue que le diffus).
+void shade(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float metal, float rough,
+           inout vec3 diff, inout vec3 spec)
 {
     float NdL = max(dot(N, L), 0.0);
     if (NdL <= 0.0)
-        return vec3(0.0);
+        return;
     vec3 H = normalize(V + L);
     float NdV = max(dot(N, V), 1e-4);
     float NdH = max(dot(N, H), 0.0);
     vec3 F0 = mix(vec3(0.04), albedo, metal);
     vec3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
-    vec3 spec = distributionGGX(NdH, rough * rough) * geometrySmith(NdV, NdL, rough) * F
-              / (4.0 * NdV * NdL + 1e-4);
+    vec3 s = distributionGGX(NdH, rough * rough) * geometrySmith(NdV, NdL, rough) * F
+           / (4.0 * NdV * NdL + 1e-4);
     vec3 kd = (1.0 - F) * (1.0 - metal);
-    return (kd * albedo / PI + spec) * radiance * NdL;
+    diff += kd * albedo / PI * radiance * NdL;
+    spec += s * radiance * NdL;
+}
+
+// Tone mapping ACES (approx. Narkowicz).
+vec3 aces(vec3 c)
+{
+    return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0);
 }
 
 void main()
@@ -256,7 +268,17 @@ void main()
     if ((uMapMask & 16) != 0)
         ao *= texture(uAOMap, vUV).r;
 
+    vec3 V = normalize(uCamPos - vWorldPos);
     vec3 N = normalize(vNormal); // normales du mesh (pas de culling : sens des triangles libre)
+
+    // Face avant/arriere d'apres la normale (le sens des triangles n'est pas
+    // fiable). Un transparent est dessine en 2 fois : arriere puis avant.
+    bool back = dot(N, V) < 0.0;
+    if (uFaceSide != 0 && (back ? 1 : -1) != uFaceSide)
+        discard;
+    if (back && uTransparent != 0)
+        N = -N; // face interieure, vue a travers l'objet
+
     if ((uMapMask & 2) != 0)
     {
         vec3 T = normalize(vTangent.xyz - N * dot(N, vTangent.xyz));
@@ -265,7 +287,6 @@ void main()
         tn.xy *= uNormalStrength;
         N = normalize(mat3(T, B, N) * tn);
     }
-    vec3 V = normalize(uCamPos - vWorldPos);
 
     // Ambiante : diffuse + reflet approche (pas de carte d'environnement ;
     // sans reflet, un metal, qui n'a pas de diffus, serait noir). Le reflet
@@ -274,9 +295,10 @@ void main()
     vec3 F0 = mix(vec3(0.04), albedo, metal);
     vec3 Fenv = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - NdV, 5.0);
     vec3 envLight = uAmbient + (uSunOn != 0 ? uSunColor * 0.2 : vec3(0.0));
-    vec3 color = (uAmbient * (1.0 - Fenv) * (1.0 - metal) * albedo + envLight * Fenv) * ao;
+    vec3 diff = uAmbient * (1.0 - Fenv) * (1.0 - metal) * albedo * ao;
+    vec3 spec = envLight * Fenv * ao;
     if (uSunOn != 0)
-        color += shade(N, V, normalize(-uSunDir), uSunColor, albedo, metal, rough);
+        shade(N, V, normalize(-uSunDir), uSunColor, albedo, metal, rough, diff, spec);
     for (int i = 0; i < uPointCount; ++i)
     {
         vec3 d = uPointPos[i] - vWorldPos;
@@ -284,17 +306,43 @@ void main()
         float r = max(uPointRange[i], 1e-3);
         float f = clamp(1.0 - pow(dist / r, 4.0), 0.0, 1.0);
         float att = f * f / (dist * dist + 1.0);
-        color += shade(N, V, d / max(dist, 1e-4), uPointColor[i] * att, albedo, metal, rough);
+        shade(N, V, d / max(dist, 1e-4), uPointColor[i] * att, albedo, metal, rough, diff, spec);
     }
 
     vec3 emissive = toLinear(uEmissive) * uEmissiveIntensity;
     if ((uMapMask & 32) != 0)
         emissive *= texture(uEmissiveMap, vUV).rgb;
+
+    if (uTransparent != 0)
+    {
+        // Le diffus est attenue, pas les reflets (une vitre reste brillante).
+        // Plus on regarde en biais, plus elle reflechit et moins on voit au
+        // travers (Fresnel) : l'alpha monte vers 1 sur les bords.
+        float opacity = uOpacity;
+        if ((uMapMask & 1) != 0)
+            opacity *= texture(uAlbedoMap, vUV).a;
+        float f = (Fenv.r + Fenv.g + Fenv.b) / 3.0;
+        float alpha = clamp(opacity + (1.0 - opacity) * f, 0.0, 1.0);
+        // Un reflet fort (soleil) cache ce qui est derriere.
+        vec3 st = aces(spec);
+        alpha = max(alpha, max(st.r, max(st.g, st.b)));
+        alpha = max(alpha, 1e-3);
+
+        // L'image est en sRGB 8 bits : le melange se fait en gamma. On sort
+        // donc la couleur "droite" (apport / alpha) encodee, puis
+        // premultipliee : additionner un apport lineaire deja encode
+        // blanchirait tout le verre.
+        vec3 straight = (diff * opacity + spec + emissive) / alpha;
+        FragColor = vec4(pow(aces(straight), vec3(1.0 / 2.2)) * alpha, alpha);
+        return;
+    }
+
+    vec3 color = diff + spec;
+
     color += emissive;
 
-    // Tone mapping ACES (approx. Narkowicz) puis gamma.
-    color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
-    FragColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
+    // Tone mapping puis gamma.
+    FragColor = vec4(pow(aces(color), vec3(1.0 / 2.2)), 1.0);
 }
 )";
 
@@ -368,6 +416,9 @@ namespace ee::render
         m_uPointPos = glGetUniformLocation(m_program, "uPointPos");
         m_uPointColor = glGetUniformLocation(m_program, "uPointColor");
         m_uPointRange = glGetUniformLocation(m_program, "uPointRange");
+        m_uTransparent = glGetUniformLocation(m_program, "uTransparent");
+        m_uOpacity = glGetUniformLocation(m_program, "uOpacity");
+        m_uFaceSide = glGetUniformLocation(m_program, "uFaceSide");
 
         // Une unite de texture fixe par map (ordre de MapSlot).
         glUseProgram(m_program);
@@ -622,6 +673,7 @@ namespace ee::render
 
     void GLRenderer::beginFrame(int width, int height)
     {
+        flushTransparent(); // image precedente pas terminee par endScene
         m_frameOk = false;
         if (width <= 0 || height <= 0)
             return;
@@ -645,6 +697,7 @@ namespace ee::render
 
     void GLRenderer::beginView(const Camera &cam, const Viewport &v)
     {
+        flushTransparent(); // transparents de la vue precedente (meme matrices)
         if (!m_frameOk || v.w <= 0 || v.h <= 0)
             return;
 
@@ -671,6 +724,8 @@ namespace ee::render
         glEnable(GL_SCISSOR_TEST); // l'effacement ne deborde pas de la vue
         glScissor(v.x, glY, v.w, v.h);
         glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
         glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDisable(GL_SCISSOR_TEST);
@@ -853,15 +908,68 @@ namespace ee::render
     {
         if (!m_init || mesh == 0 || mesh > m_meshes.size())
             return;
-        const Mesh &m = m_meshes[mesh - 1];
 
-        Mat4 vp;
-        for (int i = 0; i < 16; ++i)
-            vp.m[i] = m_vp[i];
         // model = translate * rotation * scale : on scale, on oriente, on place.
         Mat4 rot = rotationMat(eulerDeg.x, eulerDeg.y, eulerDeg.z);
         Mat4 model = mul(translate(pos.x, pos.y, pos.z),
                          mul(rot, scale3(scale.x, scale.y, scale.z)));
+
+        // Transparent : mis de cote, dessine en fin de vue par flushTransparent.
+        if (mat.transparent)
+        {
+            Transparent t;
+            t.mesh = mesh;
+            for (int i = 0; i < 16; ++i)
+                t.model[i] = model.m[i];
+            t.mat = mat;
+            float dx = pos.x - m_camPos[0], dy = pos.y - m_camPos[1], dz = pos.z - m_camPos[2];
+            t.dist2 = dx * dx + dy * dy + dz * dz;
+            m_transparent.push_back(t);
+            return;
+        }
+        drawMeshNow(mesh, model.m, mat, 0);
+    }
+
+    void GLRenderer::flushTransparent()
+    {
+        if (m_transparent.empty())
+            return;
+        if (!m_init || !m_frameOk)
+        {
+            m_transparent.clear();
+            return;
+        }
+
+        // Du plus loin au plus proche : chacun se melange a ce qui est deja
+        // dessine derriere. Pas d'ecriture de profondeur, sinon un transparent
+        // cacherait les suivants ; le test reste actif (caches par les opaques).
+        std::stable_sort(m_transparent.begin(), m_transparent.end(),
+                         [](const Transparent &_a, const Transparent &_b)
+                         { return _a.dist2 > _b.dist2; });
+        glUseProgram(m_program);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // couleur premultipliee
+        glDepthMask(GL_FALSE);
+        for (const Transparent &t : m_transparent)
+        {
+            drawMeshNow(t.mesh, t.model, t.mat, 1);  // faces arriere (interieur)
+            drawMeshNow(t.mesh, t.model, t.mat, -1); // puis faces avant
+        }
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+        m_transparent.clear();
+    }
+
+    void GLRenderer::drawMeshNow(MeshHandle mesh, const float modelM[16], const Material &mat,
+                                 int faceSide)
+    {
+        const Mesh &m = m_meshes[mesh - 1];
+        Mat4 vp, model;
+        for (int i = 0; i < 16; ++i)
+        {
+            vp.m[i] = m_vp[i];
+            model.m[i] = modelM[i];
+        }
         Mat4 mvp = mul(vp, model);
 
         glBindVertexArray(m.vao);
@@ -875,6 +983,9 @@ namespace ee::render
         glUniform1f(m_uEmissiveIntensity, mat.emissiveIntensity);
         glUniform1f(m_uNormalStrength, mat.normalStrength);
         glUniform4f(m_uUVTransform, mat.tiling[0], mat.tiling[1], mat.offset[0], mat.offset[1]);
+        glUniform1i(m_uTransparent, mat.transparent ? 1 : 0);
+        glUniform1f(m_uOpacity, mat.opacity);
+        glUniform1i(m_uFaceSide, faceSide);
 
         int mask = 0;
         for (int i = 0; i < static_cast<int>(MapSlot::Count); ++i)
@@ -934,6 +1045,7 @@ namespace ee::render
     {
         if (!m_init)
             return;
+        flushTransparent();
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // IMPORTANT : rendre la main a ImGui
     }

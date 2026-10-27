@@ -366,6 +366,8 @@ ee::render::Material renderMaterial(ee::render::IRenderer &r,
   m.tiling[1] = a.tiling[1];
   m.offset[0] = a.offset[0];
   m.offset[1] = a.offset[1];
+  m.transparent = a.transparent;
+  m.opacity = a.opacity;
   for (int i = 0; i < ee::core::kMaterialMapCount; ++i) {
     if (a.maps[i].empty())
       continue;
