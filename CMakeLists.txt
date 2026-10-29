@@ -42,6 +42,17 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
     FetchContent_MakeAvailable(json)
 endif()
 
+# ---------------------------------------------------------------------------
+# Reflexion -> catalogue de composants (Components.json). A part d'ee-core :
+# gen_components n'a besoin que de ca (+ headers), pas du rendu, de glfw...
+# ---------------------------------------------------------------------------
+add_library(ee-reflect STATIC src/reflect/CatalogGen.cpp)
+target_include_directories(ee-reflect PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
+)
+target_link_libraries(ee-reflect PUBLIC nlohmann_json::nlohmann_json)
+
 add_library(ee-core STATIC
     src/core/SceneInfo.cpp
     src/core/MeshStore.cpp
@@ -55,7 +66,6 @@ add_library(ee-core STATIC
     src/systems/RenderSystem.cpp
     src/systems/PickingSystem.cpp
     src/systems/SystemScheduler.cpp
-    src/reflect/CatalogGen.cpp
     src/reflect/SceneBind.cpp
     src/ipc/Socket.cpp
     src/ipc/SharedFrame.cpp
@@ -97,6 +107,7 @@ set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE) # sinon SDL refuse de configu
 add_subdirectory(extern/eliott-input)
 
 target_link_libraries(ee-core PUBLIC
+    ee-reflect
     glad::glad
     glfw
     OpenGL::GL
@@ -129,7 +140,15 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp")
         ${CMAKE_SOURCE_DIR}/Components/RegisterComponents.cpp
     )
     target_include_directories(gen_components PRIVATE ${CMAKE_SOURCE_DIR})
-    target_link_libraries(gen_components PRIVATE ee-core)
+    # Le code a lier se limite a la reflexion (ee-reflect). Les headers que
+    # peuvent inclure les composants (moteur, ecs, glfw...) viennent des
+    # proprietes d'ee-core, lues sans en dependre : rien d'autre n'est compile
+    # (a froid : 3 fichiers au lieu du moteur + SDL + glfw).
+    target_link_libraries(gen_components PRIVATE ee-reflect)
+    target_include_directories(gen_components PRIVATE
+        $<TARGET_PROPERTY:ee-core,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(gen_components PRIVATE
+        $<TARGET_PROPERTY:ee-core,INTERFACE_COMPILE_DEFINITIONS>)
     # Au meme niveau que l'executable du jeu (build/<nom>), pas dans le
     # sous-dossier ou ce CMakeLists est imbrique -> sa deduction de racine
     # projet (<build>/..) reste valide quelle que soit la profondeur
