@@ -15,6 +15,7 @@
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
 #include "visu/render/SplitScreen.hpp"
+#include "visu/runtime/DefaultCamera.hpp"
 #include "visu/scene/WorldLoader.hpp"
 #include "visu/scene/SystemHost.hpp"
 #include "visu/scene/WorldRender.hpp"
@@ -67,16 +68,6 @@ namespace ee::runtime
 #endif
             return exe.parent_path().parent_path().string(); // .../build/exe -> ...
         }
-    }
-
-    // Camera quand la scene n'a pas d'entite CameraComponent.
-    inline ee::render::Camera defaultCamera()
-    {
-        ee::render::Camera cam;
-        cam.pos = {0.0f, 3.0f, 12.0f};
-        cam.yaw = -1.5707963f;
-        cam.pitch = -0.15f;
-        return cam;
     }
 
     class GameSession

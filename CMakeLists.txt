@@ -53,30 +53,69 @@ target_include_directories(ee-reflect PUBLIC
 )
 target_link_libraries(ee-reflect PUBLIC nlohmann_json::nlohmann_json)
 
-add_library(ee-core STATIC
+# ---------------------------------------------------------------------------
+# Trois bibliotheques, de la plus legere a la plus complete :
+#   ee-format : le contrat editeur <-> jeu et les donnees (scene, JSON,
+#               hierarchie, materiaux, maillages, reglages, lien IPC). Ni GL,
+#               ni ECS, ni input.
+#   ee-render : rendu OpenGL et picking d'une scene (SceneInfo). Pas d'ECS.
+#   ee-core   : tout le runtime du jeu (ECS, input/SDL, systemes, boucle).
+# L'editeur (ee-visu) s'arrete a ee-render (EE_BUILD_RUNTIME=OFF) ; les
+# projets lient ee-core, qui amene les deux autres.
+# ---------------------------------------------------------------------------
+option(EE_BUILD_RUNTIME "Construit ee-core (ECS, input, SDL) en plus d'ee-format/ee-render" ON)
+
+add_library(ee-format STATIC
     src/core/SceneInfo.cpp
-    src/core/MeshStore.cpp
-    src/core/MaterialStore.cpp
-    src/core/EngineSettings.cpp
     src/core/SceneQuery.cpp
     src/core/SystemInfo.cpp
+    src/core/EngineSettings.cpp
+    src/core/MeshStore.cpp
+    src/core/MaterialStore.cpp
+    src/ipc/Socket.cpp
+    src/ipc/SharedFrame.cpp
+)
+target_include_directories(ee-format PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
+    # input/Keys.hpp seul (enum, sans dependance) : table des touches partagee
+    # par l'editeur et le jeu (visu/runtime/GlfwKeys.hpp), sans lier eliott-input.
+    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-input/include
+)
+target_link_libraries(ee-format PUBLIC nlohmann_json::nlohmann_json)
+
+# Lien editeur <-> jeu (visu/ipc) : sockets Winsock sous Windows, shm_open
+# (librt) sous Linux.
+if(WIN32)
+    target_link_libraries(ee-format PUBLIC ws2_32)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(ee-format PUBLIC rt)
+endif()
+
+add_library(ee-render STATIC
     src/render/GLRenderer.cpp
     src/render/RendererService.cpp
     src/render/StbImage.cpp
     src/systems/RenderSystem.cpp
     src/systems/PickingSystem.cpp
-    src/systems/SystemScheduler.cpp
-    src/reflect/SceneBind.cpp
-    src/ipc/Socket.cpp
-    src/ipc/SharedFrame.cpp
-)
-
-target_include_directories(ee-core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
 )
 # stb_image (chargement des textures) : prive, seul GLRenderer s'en sert.
-target_include_directories(ee-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
+target_include_directories(ee-render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
+target_link_libraries(ee-render PUBLIC
+    ee-format
+    glad::glad
+    glfw
+    OpenGL::GL
+)
+
+if(NOT EE_BUILD_RUNTIME)
+    return()
+endif()
+
+add_library(ee-core STATIC
+    src/systems/SystemScheduler.cpp
+    src/reflect/SceneBind.cpp
+)
 
 # ---------------------------------------------------------------------------
 # Sidecars des systemes moteur (include/visu/systems/<Nom>.json) : embarques
@@ -107,22 +146,11 @@ set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE) # sinon SDL refuse de configu
 add_subdirectory(extern/eliott-input)
 
 target_link_libraries(ee-core PUBLIC
+    ee-render
     ee-reflect
-    glad::glad
-    glfw
-    OpenGL::GL
-    nlohmann_json::nlohmann_json
     eliott-ecs
     eliott-input
 )
-
-# Lien editeur <-> jeu (visu/ipc) : sockets Winsock sous Windows, shm_open
-# (librt) sous Linux.
-if(WIN32)
-    target_link_libraries(ee-core PUBLIC ws2_32)
-elseif(UNIX AND NOT APPLE)
-    target_link_libraries(ee-core PUBLIC rt)
-endif()
 
 # ---------------------------------------------------------------------------
 # Outil de regeneration du catalogue de composants du PROJET (jamais dans

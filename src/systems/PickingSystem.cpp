@@ -1,5 +1,5 @@
 #include "visu/systems/PickingSystem.hpp"
-#include "visu/scene/Hierarchy.hpp"
+#include "visu/scene/SceneHierarchy.hpp"
 
 #include "visu/core/MeshStore.hpp"
 #include "math/Quaternion.hpp"

@@ -2,7 +2,7 @@
 
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
-#include "visu/scene/Hierarchy.hpp"
+#include "visu/scene/SceneHierarchy.hpp"
 #include "visu/core/MaterialStore.hpp"
 #include "visu/core/EngineSettings.hpp"
 
