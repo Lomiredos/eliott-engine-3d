@@ -8,6 +8,8 @@
 
 #include "math/Quaternion.hpp"
 
+#include "visu/core/EventBus.hpp"
+
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/RigideBodyComponent.hpp"
 #include "visu/components/TransformComponent.hpp"
@@ -17,6 +19,18 @@ struct Contact {
   bool hit = false;
   ee::math::Vector3<float> normal{0.0f, 0.0f, 0.0f};
   float depth = 0.0f;
+};
+
+// Publie sur l'EventBus quand un collider trigger chevauche un autre collider
+// (a chaque frame tant que le chevauchement dure). Aucune resolution : ni
+// position ni vitesse ne sont touchees. triggerEntity porte le collider
+// trigger (si les deux le sont, c'est l'un des deux, l'autre est
+// triggeredEntity). penetration = normale * profondeur, orientee de
+// triggerEntity vers triggeredEntity.
+struct TriggerEvent {
+  ee::ecs::EntityID triggerEntity;
+  ee::ecs::EntityID triggeredEntity;
+  ee::math::Vector3<float> penetration;
 };
 
 inline Contact SphereToSphere(const ee::math::Vector3<float> &_centerA,
@@ -139,6 +153,134 @@ inline Contact BoxToBox(const ee::math::Vector3<float> &_centerA,
   return best;
 }
 
+// ---------------------------------------------------------------------------
+// Capsule : segment [_p0, _p1] (axe Y local du collider, longueur = height)
+// arrondi d'un rayon _r. Tous les tests se ramenent a des spheres placees au
+// point le plus proche du segment.
+// ---------------------------------------------------------------------------
+
+inline ee::math::Vector3<float>
+ClosestOnSegment(const ee::math::Vector3<float> &_p,
+                 const ee::math::Vector3<float> &_a,
+                 const ee::math::Vector3<float> &_b) {
+  ee::math::Vector3<float> ab = _b - _a;
+  float len2 = ab.Dot(ab);
+  if (len2 < 1e-12f)
+    return _a;
+  float t = (_p - _a).Dot(ab) / len2;
+  t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+  return _a + ab * t;
+}
+
+// Points les plus proches entre les segments [_p1,_q1] et [_p2,_q2]
+// (Ericson, Real-Time Collision Detection, 5.1.9).
+inline void ClosestSegmentSegment(const ee::math::Vector3<float> &_p1,
+                                  const ee::math::Vector3<float> &_q1,
+                                  const ee::math::Vector3<float> &_p2,
+                                  const ee::math::Vector3<float> &_q2,
+                                  ee::math::Vector3<float> &_c1,
+                                  ee::math::Vector3<float> &_c2) {
+  auto clamp01 = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
+  const float eps = 1e-12f;
+  ee::math::Vector3<float> d1 = _q1 - _p1;
+  ee::math::Vector3<float> d2 = _q2 - _p2;
+  ee::math::Vector3<float> r = _p1 - _p2;
+  float a = d1.Dot(d1);
+  float e = d2.Dot(d2);
+  float f = d2.Dot(r);
+  float s, t;
+
+  if (a <= eps && e <= eps) {
+    s = t = 0.0f;
+  } else if (a <= eps) {
+    s = 0.0f;
+    t = clamp01(f / e);
+  } else {
+    float c = d1.Dot(r);
+    if (e <= eps) {
+      t = 0.0f;
+      s = clamp01(-c / a);
+    } else {
+      float b = d1.Dot(d2);
+      float denom = a * e - b * b;
+      s = denom > eps ? clamp01((b * f - c * e) / denom) : 0.0f;
+      t = (b * s + f) / e;
+      if (t < 0.0f) {
+        t = 0.0f;
+        s = clamp01(-c / a);
+      } else if (t > 1.0f) {
+        t = 1.0f;
+        s = clamp01((b - c) / a);
+      }
+    }
+  }
+  _c1 = _p1 + d1 * s;
+  _c2 = _p2 + d2 * t;
+}
+
+inline Contact CapsuleToSphere(const ee::math::Vector3<float> &_p0,
+                               const ee::math::Vector3<float> &_p1, float _rA,
+                               const ee::math::Vector3<float> &_center,
+                               float _rB) {
+  return SphereToSphere(ClosestOnSegment(_center, _p0, _p1), _center, _rA,
+                        _rB);
+}
+
+inline Contact CapsuleToCapsule(const ee::math::Vector3<float> &_a0,
+                                const ee::math::Vector3<float> &_a1, float _rA,
+                                const ee::math::Vector3<float> &_b0,
+                                const ee::math::Vector3<float> &_b1,
+                                float _rB) {
+  ee::math::Vector3<float> cA, cB;
+  ClosestSegmentSegment(_a0, _a1, _b0, _b1, cA, cB);
+  return SphereToSphere(cA, cB, _rA, _rB);
+}
+
+// Capsule/box : la distance d'un point du segment a la boite est convexe le
+// long du segment, on cherche son minimum par recherche ternaire puis on fait
+// un test sphere/box en ce point. Si le segment traverse la boite, on garde
+// le point (min trouve ou extremites) qui penetre le plus.
+inline Contact CapsuleToBox(const ee::math::Vector3<float> &_p0,
+                            const ee::math::Vector3<float> &_p1, float _r,
+                            const ee::math::Vector3<float> &_boxCenter,
+                            const ee::math::Vector3<float> &_half,
+                            const ee::math::Quaternion &_boxRot) {
+  ee::math::Vector3<float> seg = _p1 - _p0;
+
+  auto dist2ToBox = [&](float _t) {
+    ee::math::Vector3<float> d = (_p0 + seg * _t) - _boxCenter;
+    float lx = d.Dot(_boxRot.right()), ly = d.Dot(_boxRot.up()),
+          lz = d.Dot(_boxRot.back());
+    auto out = [](float v, float h) {
+      float o = std::fabs(v) - h;
+      return o > 0.0f ? o : 0.0f;
+    };
+    float ox = out(lx, _half.x), oy = out(ly, _half.y), oz = out(lz, _half.z);
+    return ox * ox + oy * oy + oz * oz;
+  };
+
+  float lo = 0.0f, hi = 1.0f;
+  for (int it = 0; it < 32; ++it) {
+    float m1 = lo + (hi - lo) / 3.0f;
+    float m2 = hi - (hi - lo) / 3.0f;
+    if (dist2ToBox(m1) <= dist2ToBox(m2))
+      hi = m2;
+    else
+      lo = m1;
+  }
+  float tBest = 0.5f * (lo + hi);
+
+  Contact best = SphereToBox(_p0 + seg * tBest, _r, _boxCenter, _half, _boxRot);
+  if (best.hit && dist2ToBox(tBest) <= 1e-8f) {
+    for (float t : {0.0f, 1.0f}) {
+      Contact c = SphereToBox(_p0 + seg * t, _r, _boxCenter, _half, _boxRot);
+      if (c.hit && c.depth > best.depth)
+        best = c;
+    }
+  }
+  return best;
+}
+
 // Collider d'une entite exprime dans le monde : meme calcul que le rendu
 // wire (RenderSystem), pour que la physique colle a ce qu'on voit. L'offset
 // est mis a l'echelle puis tourne par le transform ; la rotation du collider
@@ -148,7 +290,9 @@ struct WorldCollider {
   ee::math::Vector3<float> center;
   ee::math::Quaternion rot;
   ee::math::Vector3<float> half; // Box
-  float radius = 0.0f;           // Sphere
+  float radius = 0.0f;           // Sphere, Capsule
+  ee::math::Vector3<float> p0;   // Capsule : extremites du segment
+  ee::math::Vector3<float> p1;
 };
 
 // _tf = transform MONDE de l'entite (parent resolu, voir worldXform).
@@ -166,6 +310,14 @@ inline WorldCollider toWorld(const ee::scene::Xform &_tf,
   float s = std::fmax(std::fabs(_tf.scale.x),
                       std::fmax(std::fabs(_tf.scale.y), std::fabs(_tf.scale.z)));
   w.radius = _cc.radius * s;
+  if (w.shape == ColliderShape::Capsule) {
+    // Comme le wire : rayon suit l'echelle X, longueur du segment l'echelle Y.
+    w.radius = _cc.radius * std::fabs(_tf.scale.x);
+    ee::math::Vector3<float> axis =
+        w.rot.up() * (0.5f * _cc.height * std::fabs(_tf.scale.y));
+    w.p0 = w.center - axis;
+    w.p1 = w.center + axis;
+  }
   return w;
 }
 
@@ -182,7 +334,18 @@ inline Contact collide(const WorldCollider &_a, const WorldCollider &_b) {
   }
   if (_a.shape == S::Box && _b.shape == S::Box)
     return BoxToBox(_a.center, _a.half, _a.rot, _b.center, _b.half, _b.rot);
-  // ##TODO : capsule
+  if (_a.shape == S::Capsule && _b.shape == S::Capsule)
+    return CapsuleToCapsule(_a.p0, _a.p1, _a.radius, _b.p0, _b.p1, _b.radius);
+  if (_a.shape == S::Capsule && _b.shape == S::Sphere)
+    return CapsuleToSphere(_a.p0, _a.p1, _a.radius, _b.center, _b.radius);
+  if (_a.shape == S::Capsule && _b.shape == S::Box)
+    return CapsuleToBox(_a.p0, _a.p1, _a.radius, _b.center, _b.half, _b.rot);
+  // B capsule, A sphere/box : test inverse, normale retournee (A -> B).
+  if (_b.shape == S::Capsule) {
+    Contact c = collide(_b, _a);
+    c.normal = -c.normal;
+    return c;
+  }
   return {};
 }
 
@@ -226,8 +389,15 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       if (_world.hasComponent<RigideBodyComponent>(idB))
         rbB = _world.getComponent<RigideBodyComponent>(idB);
 
-      // ##TODO trigger : si cc.isTrigger || occ.isTrigger -> emettre un
-      //        TriggerEvent et NE PAS resoudre (ni position, ni vitesse).
+      // Trigger : on previent, on ne resout pas (ni position, ni vitesse).
+      if (cc.isTrigger || occ.isTrigger) {
+        ee::math::Vector3<float> pen = info.normal * info.depth; // A -> B
+        if (cc.isTrigger)
+          ee::core::EventBus::getInstance().publish(TriggerEvent{idA, idB, pen});
+        else
+          ee::core::EventBus::getInstance().publish(TriggerEvent{idB, idA, -pen});
+        continue;
+      }
 
       // Un corps statique se comporte comme un decor : il ne bouge pas.
       bool dynA = rbA && !rbA->isStatic;
