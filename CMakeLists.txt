@@ -52,6 +52,9 @@ target_include_directories(ee-reflect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
 )
+add_executable(gen_standard_catalog EXCLUDE_FROM_ALL tools/gen_standard_catalog_main.cpp)
+target_link_libraries(gen_standard_catalog PRIVATE ee-reflect)
+
 target_link_libraries(ee-reflect PUBLIC nlohmann_json::nlohmann_json)
 
 # ---------------------------------------------------------------------------
