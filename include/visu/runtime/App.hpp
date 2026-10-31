@@ -10,6 +10,7 @@
 // touche jamais a main.
 // ---------------------------------------------------------------------------
 
+#include "visu/core/Window.hpp"
 #include "visu/runtime/GameSession.hpp"
 #include "visu/runtime/GlfwKeys.hpp"
 #include "visu/render/GLRenderer.hpp"
@@ -37,6 +38,12 @@ namespace ee::runtime
 {
     namespace detail
     {
+        // Pas de temps max d'un tick (1/20 s). Une frame longue (chargement de
+        // textures, fenetre deplacee, breakpoint...) donnerait sinon un dt
+        // enorme : la physique ferait un grand saut et traverserait le sol.
+        // Au-dela, le jeu ralentit au lieu de sauter.
+        inline constexpr float kMaxDt = 0.05f;
+
         // Nourrit InputManager depuis un etat "enfonce ou pas" par touche et
         // par bouton : appui/maintien/relache sont deduits de la frame d'avant.
         // Meme chemin que l'etat vienne de GLFW (fenetre du jeu) ou de l'editeur.
@@ -263,6 +270,9 @@ namespace ee::runtime
 
             ee::render::GLRenderer renderer; // offscreen (FBO) par defaut
 
+            ee::core::Window &window = ee::core::Window::getInstance();
+            window.runtimeInit(_game.config().windowTitle, true);
+
             const double frameTime = 1.0 / 60.0; // pas de vsync sans fenetre visible
             double last = glfwGetTime();
             while (true)
@@ -272,8 +282,17 @@ namespace ee::runtime
                 if (!link.update(_game, start))
                     break;
 
-                float dt = static_cast<float>(start - last);
+                float dt = std::min(static_cast<float>(start - last), detail::kMaxDt);
                 last = start;
+
+                // Taille du panneau preview, connue des systemes des ce tick.
+                int w = std::min(link.width() > 0 ? link.width() : _game.config().width, ee::ipc::SharedFrame::kMaxWidth);
+                int h = std::min(link.height() > 0 ? link.height() : _game.config().height, ee::ipc::SharedFrame::kMaxHeight);
+                window.runtimeSetSize(w, h);
+                // Pas de vraie fenetre : titre / curseur / close sans effet.
+                window.runtimeTakeTitleChange();
+                window.runtimeTakeCursorChange();
+
                 if (link.paused())
                     applyRemoteInput(ee::ipc::InputState{}); // en pause : plus aucun input
                 else
@@ -282,8 +301,6 @@ namespace ee::runtime
                     _game.tick(dt);
                 }
 
-                int w = std::min(link.width() > 0 ? link.width() : _game.config().width, ee::ipc::SharedFrame::kMaxWidth);
-                int h = std::min(link.height() > 0 ? link.height() : _game.config().height, ee::ipc::SharedFrame::kMaxHeight);
                 _game.render(renderer, w, h, link.selected());
                 if (renderer.texture() != 0)
                 {
@@ -343,6 +360,9 @@ namespace ee::runtime
         ee::render::GLRenderer renderer;
         renderer.setOffscreen(false);
 
+        ee::core::Window &window = ee::core::Window::getInstance();
+        window.runtimeInit(cfg.windowTitle, false);
+
         // Boucle.
         double last = glfwGetTime();
         while (!glfwWindowShouldClose(win))
@@ -352,14 +372,26 @@ namespace ee::runtime
                 glfwSetWindowShouldClose(win, 1);
 
             double now = glfwGetTime();
-            float dt = static_cast<float>(now - last);
+            float dt = std::min(static_cast<float>(now - last), detail::kMaxDt);
             last = now;
 
             detail::pollInput(win);
-            game.tick(dt);
 
             int w, h;
             glfwGetFramebufferSize(win, &w, &h);
+            window.runtimeSetSize(w, h);
+
+            game.tick(dt);
+
+            // Demandes faites par les systemes pendant le tick.
+            if (window.runtimeTakeTitleChange())
+                glfwSetWindowTitle(win, window.title().c_str());
+            if (window.runtimeTakeCursorChange())
+                glfwSetInputMode(win, GLFW_CURSOR,
+                                 window.isCursorLocked() ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+            if (window.runtimeCloseRequested())
+                glfwSetWindowShouldClose(win, 1);
+
             game.render(renderer, w, h);
 
             glfwSwapBuffers(win);

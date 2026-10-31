@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -110,6 +111,10 @@ namespace ee::runtime
                 _registerSystems(m_host);
             m_host.build(m_world, m_reg, schedule);
 
+            // Suivi de toutes les entites vivantes (rendu, cameras, lumieres),
+            // enregistre AVANT le chargement pour voir aussi celles de la scene.
+            m_alive = m_world.registerSystem<AliveEntities>();
+
             // 4) Scene -> World typé.
             m_entities = ee::scene::loadSceneIntoWorld(m_world, m_scene, m_reg);
             std::printf("[runtime] %zu entites, %zu systeme(s)\n", m_entities.size(), schedule.size());
@@ -126,9 +131,22 @@ namespace ee::runtime
 
         // Une vue par camera (ecran partage, voir splitScreen) ; sans
         // camera dans la scene, defaultCamera() en plein ecran.
-        // _selected : index d'entite dont le collider est dessine (-1 = aucun).
+        // _selected : index d'entite DE LA SCENE dont le collider est dessine
+        // (-1 = aucun).
         void render(ee::render::IRenderer &_r, int _w, int _h, int _selected = -1)
         {
+            const std::vector<ee::ecs::EntityID> alive = aliveEntities();
+
+            // Index scene -> position dans la liste des vivantes (l'entite a pu
+            // etre detruite, ou la liste contient des entites creees en jeu).
+            int selectedAlive = -1;
+            if (_selected >= 0 && _selected < static_cast<int>(m_entities.size()))
+            {
+                auto it = std::find(alive.begin(), alive.end(), m_entities[_selected]);
+                if (it != alive.end())
+                    selectedAlive = static_cast<int>(it - alive.begin());
+            }
+
             std::vector<ee::render::Camera> cams = cameras();
             std::vector<ee::render::Viewport> views =
                 ee::render::splitScreen(static_cast<int>(cams.size()), _w, _h);
@@ -137,16 +155,26 @@ namespace ee::runtime
             for (size_t i = 0; i < cams.size(); ++i)
             {
                 _r.beginView(cams[i], views[i]);
-                ee::scene::renderWorld(_r, m_world, m_entities, _selected);
+                ee::scene::renderWorld(_r, m_world, alive, selectedAlive);
             }
             _r.endScene();
+        }
+
+        // Toutes les entites vivantes du World, triees par id : celles de la
+        // scene ET celles creees en jeu (createEntity), sans les detruites.
+        // A jour apres chaque flush (fin de tick).
+        std::vector<ee::ecs::EntityID> aliveEntities() const
+        {
+            if (!m_alive)
+                return m_entities;
+            return {m_alive->m_entities.begin(), m_alive->m_entities.end()};
         }
 
         // Cameras de la frame : entites CameraComponent (suivent leur
         // transform, donc deplacables par un systeme), sinon defaultCamera().
         std::vector<ee::render::Camera> cameras()
         {
-            std::vector<ee::render::Camera> cams = ee::scene::worldCameras(m_world, m_entities);
+            std::vector<ee::render::Camera> cams = ee::scene::worldCameras(m_world, aliveEntities());
             if (cams.empty())
                 cams.push_back(defaultCamera());
             return cams;
@@ -155,15 +183,25 @@ namespace ee::runtime
         const Config &config() const { return m_cfg; }
         const SceneInfo &scene() const { return m_scene; }
         ee::ecs::World &world() { return m_world; }
+        // Entites de la SCENE, par index de scene (lien editeur, references) :
+        // ni celles creees en jeu, ni a jour des destructions. Pour tout ce
+        // qui vit dans le World : aliveEntities().
         const std::vector<ee::ecs::EntityID> &entities() const { return m_entities; }
         const ee::scene::WorldRegistry &registry() const { return m_reg; }
 
     private:
+        // Signature vide : l'ECS y range TOUTES les entites au flush et les
+        // retire a leur destruction. Pas un UpdateSystem : jamais appele.
+        struct AliveEntities : ee::ecs::System
+        {
+        };
+
         Config m_cfg;
         SceneInfo m_scene;
         ee::scene::WorldRegistry m_reg;
         ee::ecs::World m_world;
         ee::scene::SystemHost m_host;
         std::vector<ee::ecs::EntityID> m_entities;
+        std::shared_ptr<AliveEntities> m_alive;
     };
 }

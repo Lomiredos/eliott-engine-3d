@@ -39,17 +39,43 @@ namespace ee::scene
 
     // Angles d'Euler (degres, X Y Z) d'un quaternion, meme convention que
     // Quaternion::fromEulerDeg (q = qz*qy*qx).
+    // Calcul via la matrice R = Rz * Ry * Rx, en double. Y est l'angle du
+    // milieu : a Y = +-90 (blocage de cardan) X et Z tournent autour du meme
+    // axe et les formules generales divisent 0 par 0 ; on pose alors Z = 0
+    // et on met toute la rotation restante dans X.
     inline Vec3f eulerDegFromQuat(const Quat &_q)
     {
-        float sinPitch = 2.0f * (_q.w * _q.y - _q.z * _q.x);
-        sinPitch = sinPitch < -1.0f ? -1.0f : (sinPitch > 1.0f ? 1.0f : sinPitch);
-        float pitch = std::asin(sinPitch);
-        float yaw = std::atan2(2.0f * (_q.x * _q.y + _q.w * _q.z),
-                               1.0f - 2.0f * (_q.y * _q.y + _q.z * _q.z));
-        float roll = std::atan2(2.0f * (_q.y * _q.z + _q.w * _q.x),
-                                1.0f - 2.0f * (_q.x * _q.x + _q.y * _q.y));
-        const float toDeg = 180.0f / 3.14159265358979323846f;
-        return {roll * toDeg, pitch * toDeg, yaw * toDeg};
+        const double w = _q.w, x = _q.x, y = _q.y, z = _q.z;
+        const double r00 = 1.0 - 2.0 * (y * y + z * z);
+        const double r01 = 2.0 * (x * y - w * z);
+        const double r02 = 2.0 * (x * z + w * y);
+        const double r10 = 2.0 * (x * y + w * z);
+        const double r20 = 2.0 * (x * z - w * y);
+        const double r21 = 2.0 * (y * z + w * x);
+        const double r22 = 1.0 - 2.0 * (x * x + y * y);
+
+        double ax, ay, az;
+        if (r20 <= -0.999999) // Y = +90
+        {
+            ay = 3.14159265358979323846 / 2.0;
+            az = 0.0;
+            ax = std::atan2(r01, r02);
+        }
+        else if (r20 >= 0.999999) // Y = -90
+        {
+            ay = -3.14159265358979323846 / 2.0;
+            az = 0.0;
+            ax = std::atan2(-r01, -r02);
+        }
+        else
+        {
+            ay = std::asin(-r20);
+            ax = std::atan2(r21, r22);
+            az = std::atan2(r10, r00);
+        }
+        const double toDeg = 180.0 / 3.14159265358979323846;
+        return {static_cast<float>(ax * toDeg), static_cast<float>(ay * toDeg),
+                static_cast<float>(az * toDeg)};
     }
 
     inline Xform makeXform(Vec3f _pos, Vec3f _eulerDeg, Vec3f _scale)
