@@ -45,12 +45,14 @@ struct ee::reflection::Reflect<ColliderComponent>
 
     static void visit(ColliderComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-
         _v.visit("Shape", _c.shape);
-        _v.visit("OffSet", _c.offset);
-        _v.visit("Euler", _c.euler);
         _v.visit("IsActive", _c.isActive);
         _v.visit("IsTrigger", _c.isTrigger);
+        _v.separator();
+        _v.visit("OffSet", _c.offset);
+        _v.visit("Euler", _c.euler);
+        _v.separator();
+        _v.label("Selon la forme");
         _v.visit("Radius", _c.radius);
         _v.visit("HalfExtents", _c.halfExtents);
         _v.visit("Height", _c.height);

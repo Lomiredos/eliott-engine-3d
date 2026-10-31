@@ -39,6 +39,7 @@ struct ee::reflection::Reflect<TransformComponent>
         _v.visit("Position", _c.position);
         _v.visit("Euler", _c.euler);
         _v.visit("Scale", _c.scale);
+        _v.separator();
         _v.visit("Parent", _c.parent);
     }
 };

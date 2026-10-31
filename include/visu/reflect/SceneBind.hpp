@@ -10,15 +10,17 @@
 #include <variant>
 #include <vector>
 #include <cassert>
+#include <cstring>
 
 
 namespace ee::reflection
 {
     class KeyPath {
         public:
-            void push(const char *_n) {m_stack.push_back(m_stack.empty() ? _n :m_stack.back() + "." + _n);}
+            // Un '.' dans un nom casserait le decoupage des cles "Groupe.champ".
+            void push(const char *_n) {assert(!std::strchr(_n, '.')); m_stack.push_back(m_stack.empty() ? _n :m_stack.back() + "." + _n);}
             void pop() {m_stack.pop_back();}
-            std::string key(const char *_n) const {return m_stack.empty() ? _n : m_stack.back() + "." + _n;}
+            std::string key(const char *_n) const {assert(!std::strchr(_n, '.')); return m_stack.empty() ? _n : m_stack.back() + "." + _n;}
             bool empty() const {return m_stack.empty();}
         private:
             std::vector<std::string> m_stack;

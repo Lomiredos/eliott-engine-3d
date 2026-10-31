@@ -26,6 +26,7 @@ struct ee::reflection::Reflect<CameraComponent>
         _v.visit("Fov", _c.fov);
         _v.visit("NearZ", _c.nearZ);
         _v.visit("FarZ", _c.farZ);
+        _v.separator();
         _v.visit("IsMain", _c.isMain);
     }
 };
