@@ -29,11 +29,26 @@ namespace ee::math
             z += _other.z;
             return *this;
         }
+Vector3<T> &operator+=(const T &_other)
+        {
+            x += _other;
+            y += _other;
+            z += _other;
+            return *this;
+        }
+
         Vector3<T> &operator-=(const Vector3<T> &_other)
         {
             x -= _other.x;
             y -= _other.y;
             z -= _other.z;
+            return *this;
+        }
+        Vector3<T> &operator-=(const T &_other)
+        {
+            x -= _other;
+            y -= _other;
+            z -= _other;
             return *this;
         }
         Vector3<T> &operator*=(const Vector3<T> &_other)
@@ -43,6 +58,15 @@ namespace ee::math
             z *= _other.z;
             return *this;
         }
+        Vector3<T> &operator*=(const T &_other)
+        {
+            x *= _other;
+            y *= _other;
+            z *= _other;
+            return *this;
+        }
+
+
         Vector3<T> &operator/=(const Vector3<T> &_other)
         {
             if (_other.x != 0 && _other.y != 0 && _other.z != 0)
