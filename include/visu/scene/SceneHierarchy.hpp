@@ -13,7 +13,6 @@
 // ---------------------------------------------------------------------------
 
 #include "visu/core/SceneInfo.hpp"
-
 #include "math/Quaternion.hpp"
 #include "math/Vector3.hpp"
 
@@ -21,6 +20,9 @@
 #include <string>
 #include <variant>
 #include <vector>
+
+
+
 
 namespace ee::scene
 {
@@ -139,7 +141,7 @@ namespace ee::scene
 
     namespace detail
     {
-        inline float num(const ComponentInstance &_c, const char *_k, float _def)
+        inline float num(const ComponentInstance &_c, const std::string &_k, float _def)
         {
             auto it = _c.values.find(_k);
             if (it == _c.values.end())
@@ -150,6 +152,24 @@ namespace ee::scene
                 return static_cast<float>(*p);
             return _def;
         }
+        inline std::string fieldKey(const char *_group, const char *_field)
+        {
+            return std::string(_group) + "." + _field;
+        }
+
+        inline Vec3f readVec3(const ComponentInstance &_c, const char *_name, Vec3f _def)
+        {
+            return {detail::num(_c, fieldKey(_name, "x"), _def.x),
+                    detail::num(_c, fieldKey(_name, "y"), _def.y),
+                    detail::num(_c, fieldKey(_name, "z"), _def.z)};
+        }
+
+        inline void writeVec3(ComponentInstance &_c, const char *_name, const Vec3f &_v)
+        {
+            _c.values[fieldKey(_name, "x")] = _v.x;
+            _c.values[fieldKey(_name, "y")] = _v.y;
+            _c.values[fieldKey(_name, "z")] = _v.z;
+        }
     }
 
     // Transform local d'une entite de la scene (identite sans Transform).
@@ -159,9 +179,9 @@ namespace ee::scene
         if (!tf)
             return {};
         using detail::num;
-        return makeXform({num(*tf, "PositionX", 0.0f), num(*tf, "PositionY", 0.0f), num(*tf, "PositionZ", 0.0f)},
-                         {num(*tf, "EuleurX", 0.0f), num(*tf, "EuleurY", 0.0f), num(*tf, "EuleurZ", 0.0f)},
-                         {num(*tf, "ScaleX", 1.0f), num(*tf, "ScaleY", 1.0f), num(*tf, "ScaleZ", 1.0f)});
+        return makeXform(detail::readVec3(*tf, "Position", {0, 0, 0}),
+                        detail::readVec3(*tf, "Euler", {0, 0, 0}),
+                        detail::readVec3(*tf, "Scale", {1, 1, 1}));
     }
 
     // Parent declare (index), -1 si aucun ou invalide (hors scene, sans Transform).
@@ -244,15 +264,9 @@ namespace ee::scene
     // Ecrit un transform local dans le TransformComponent (valeurs de scene).
     inline void writeLocalXform(ComponentInstance &_tf, const Xform &_local)
     {
-        _tf.values["PositionX"] = _local.pos.x;
-        _tf.values["PositionY"] = _local.pos.y;
-        _tf.values["PositionZ"] = _local.pos.z;
-        _tf.values["EuleurX"] = _local.eulerDeg.x;
-        _tf.values["EuleurY"] = _local.eulerDeg.y;
-        _tf.values["EuleurZ"] = _local.eulerDeg.z;
-        _tf.values["ScaleX"] = _local.scale.x;
-        _tf.values["ScaleY"] = _local.scale.y;
-        _tf.values["ScaleZ"] = _local.scale.z;
+        detail::writeVec3(_tf, "Position", _local.pos);
+        detail::writeVec3(_tf, "Euler", _local.eulerDeg);
+        detail::writeVec3(_tf, "Scale", _local.scale);
     }
 
     // Change le parent de _child (-1 = racine) en GARDANT sa place dans le

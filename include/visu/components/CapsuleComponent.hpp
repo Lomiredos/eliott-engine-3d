@@ -16,7 +16,7 @@ struct ee::reflection::Reflect<CapsuleComponent>
 
     static void visit(CapsuleComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("radius", _c.radius);
-        _v.visit("height", _c.height);
+        _v.visit("Radius", _c.radius);
+        _v.visit("Height", _c.height);
     }
 };

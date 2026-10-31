@@ -19,6 +19,6 @@ struct ee::reflection::Reflect<MaterialComponent>
 
     static void visit(MaterialComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("path", _c.path);
+        _v.visit("Path", _c.path);
     }
 };

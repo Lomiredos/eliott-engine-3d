@@ -2,7 +2,7 @@
   "category": "engine",
   "components": [
     "TransformComponent",
-    "RigideBodyComponent"
+    "RigidBodyComponent"
   ],
   "name": "MotionSystem",
   "priority": 100

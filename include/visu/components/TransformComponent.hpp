@@ -37,7 +37,7 @@ struct ee::reflection::Reflect<TransformComponent>
     static void visit(TransformComponent &_c, ee::reflection::FieldVisitor &_v)
     {
         _v.visit("Position", _c.position);
-        _v.visit("Euleur", _c.euler);
+        _v.visit("Euler", _c.euler);
         _v.visit("Scale", _c.scale);
         _v.visit("Parent", _c.parent);
     }

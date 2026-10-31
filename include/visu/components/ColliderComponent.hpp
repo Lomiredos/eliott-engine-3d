@@ -51,7 +51,7 @@ struct ee::reflection::Reflect<ColliderComponent>
         _v.visit("Euler", _c.euler);
         _v.visit("IsActive", _c.isActive);
         _v.visit("IsTrigger", _c.isTrigger);
-        _v.visit("radius", _c.radius);
+        _v.visit("Radius", _c.radius);
         _v.visit("HalfExtents", _c.halfExtents);
         _v.visit("Height", _c.height);
     }

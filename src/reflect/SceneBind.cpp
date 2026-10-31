@@ -9,7 +9,7 @@ namespace ee::reflection
 {
     void LoadVisitor::visit(const char *_name, int &_value)
     {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it == m_comp.values.end())
             return;
         if (auto p = std::get_if<int>(&it->second))
@@ -22,7 +22,7 @@ namespace ee::reflection
 
     void LoadVisitor::visit(const char *_name, bool &_value)
     {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it == m_comp.values.end())
             return;
         if (auto p = std::get_if<bool>(&it->second))
@@ -35,36 +35,19 @@ namespace ee::reflection
 
     void LoadVisitor::visit(const char *_name, float &_value)
     {
-        _value = ee::scene::getFloat(m_comp, _name, _value);
+        _value = ee::scene::getFloat(m_comp, m_path.key(_name), _value);
     }
 
     void LoadVisitor::visit(const char *_name, std::string &_value)
     {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it != m_comp.values.end())
             if (auto p = std::get_if<std::string>(&it->second))
                 _value = *p;
     }
 
-    void LoadVisitor::visit(const char *_name, ee::math::Vector3<float> &_value)
-    {
-        std::string s(_name);
-        _value.x = ee::scene::getFloat(m_comp, s + "X", _value.x);
-        _value.y = ee::scene::getFloat(m_comp, s + "Y", _value.y);
-        _value.z = ee::scene::getFloat(m_comp, s + "Z", _value.z);
-    }
-
-    void LoadVisitor::visit(const char *_name, ee::math::Quaternion &_value)
-    {
-        std::string s(_name);
-        _value.w = ee::scene::getFloat(m_comp, s + "W", _value.w);
-        _value.x = ee::scene::getFloat(m_comp, s + "X", _value.x);
-        _value.y = ee::scene::getFloat(m_comp, s + "Y", _value.y);
-        _value.z = ee::scene::getFloat(m_comp, s + "Z", _value.z);
-    }
-
     void LoadVisitor::visitEnum(const char *_name, int& _value, const char* const* _labels, int _count) {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it == m_comp.values.end())
             return;
 
@@ -87,7 +70,7 @@ namespace ee::reflection
     // Scene : index de l'entite (-1 = aucune) -> EntityID via la table.
     void LoadVisitor::visitEntity(const char *_name, ee::EntityRef &_value, const char *)
     {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it == m_comp.values.end())
             return;
         int index = -1;
@@ -107,37 +90,21 @@ namespace ee::reflection
                                                                     : ee::EntityRef::kNone;
     }
 
-    void SaveVisitor::visit(const char *_name, int &_value) { m_comp.values[_name] = _value; }
+    void SaveVisitor::visit(const char *_name, int &_value) { m_comp.values[m_path.key(_name)] = _value; }
 
-    void SaveVisitor::visit(const char *_name, bool &_value) { m_comp.values[_name] = _value; }
+    void SaveVisitor::visit(const char *_name, bool &_value) { m_comp.values[m_path.key(_name)] = _value; }
 
-    void SaveVisitor::visit(const char *_name, float &_value) { m_comp.values[_name] = _value; }
+    void SaveVisitor::visit(const char *_name, float &_value) { m_comp.values[m_path.key(_name)] = _value; }
 
-    void SaveVisitor::visit(const char *_name, std::string &_value) { m_comp.values[_name] = _value; }
+    void SaveVisitor::visit(const char *_name, std::string &_value) { m_comp.values[m_path.key(_name)] = _value; }
 
-    void SaveVisitor::visit(const char *_name, ee::math::Vector3<float> &_value)
-    {
-        std::string s(_name);
-        m_comp.values[s + "X"] = _value.x;
-        m_comp.values[s + "Y"] = _value.y;
-        m_comp.values[s + "Z"] = _value.z;
-    }
-
-    void SaveVisitor::visit(const char *_name, ee::math::Quaternion &_value)
-    {
-        std::string s(_name);
-        m_comp.values[s + "W"] = _value.w;
-        m_comp.values[s + "X"] = _value.x;
-        m_comp.values[s + "Y"] = _value.y;
-        m_comp.values[s + "Z"] = _value.z;
-    }
 
     void SaveVisitor::visitEnum(const char *_name, int &_value, const char *const *_labels, int _count)
     {
         if (_value >= 0 && _value < _count)
-            m_comp.values[_name] = std::string(_labels[_value]);
+            m_comp.values[m_path.key(_name)] = std::string(_labels[_value]);
         else
-            m_comp.values[_name] = _value;
+            m_comp.values[m_path.key(_name)] = _value;
     }
 
     // EntityID -> index dans la scene ; -1 si aucune ou entite creee en jeu.
@@ -156,12 +123,12 @@ namespace ee::reflection
                         break;
                     }
         }
-        m_comp.values[_name] = index;
+        m_comp.values[m_path.key(_name)] = index;
     }
 
     void LoadVisitor::visit(const char *_name, ee::Color3 &_value)
     {
-        auto it = m_comp.values.find(_name);
+        auto it = m_comp.values.find(m_path.key(_name));
         if (it != m_comp.values.end())
             if (auto p = std::get_if<std::string>(&it->second))
                 ee::fromHex(*p, _value); // texte invalide : couleur inchangee
@@ -169,6 +136,6 @@ namespace ee::reflection
 
     void SaveVisitor::visit(const char *_name, ee::Color3 &_value)
     {
-        m_comp.values[_name] = ee::toHex(_value);
+        m_comp.values[m_path.key(_name)] = ee::toHex(_value);
     }
 }

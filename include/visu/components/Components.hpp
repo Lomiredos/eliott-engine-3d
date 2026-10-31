@@ -5,7 +5,7 @@
 #include "visu/components/RectComponent.hpp"
 #include "visu/components/CapsuleComponent.hpp"
 #include "visu/components/MeshComponent.hpp"
-#include "visu/components/RigideBodyComponent.hpp"
+#include "visu/components/RigidBodyComponent.hpp"
 #include "visu/components/ColliderComponent.hpp"
 #include "visu/components/CameraComponent.hpp"
 #include "visu/components/MaterialComponent.hpp"

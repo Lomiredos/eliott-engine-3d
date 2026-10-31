@@ -11,7 +11,7 @@
 #include "visu/core/EventBus.hpp"
 
 #include "visu/components/ColliderComponent.hpp"
-#include "visu/components/RigideBodyComponent.hpp"
+#include "visu/components/RigidBodyComponent.hpp"
 #include "visu/components/TransformComponent.hpp"
 #include "visu/scene/Hierarchy.hpp"
 
@@ -366,9 +366,9 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
     if (!cc.isActive)
       continue;
 
-    RigideBodyComponent *rbA = nullptr;
-    if (_world.hasComponent<RigideBodyComponent>(idA))
-      rbA = _world.getComponent<RigideBodyComponent>(idA);
+    RigidBodyComponent *rbA = nullptr;
+    if (_world.hasComponent<RigidBodyComponent>(idA))
+      rbA = _world.getComponent<RigidBodyComponent>(idA);
 
     for (size_t j = i + 1; j < ents.size(); ++j) {
       ee::ecs::EntityID idB = ents[j];
@@ -385,9 +385,9 @@ inline void CollisionSystem::update(ee::ecs::World &_world, float _dt) {
       if (!info.hit)
         continue;
 
-      RigideBodyComponent *rbB = nullptr;
-      if (_world.hasComponent<RigideBodyComponent>(idB))
-        rbB = _world.getComponent<RigideBodyComponent>(idB);
+      RigidBodyComponent *rbB = nullptr;
+      if (_world.hasComponent<RigidBodyComponent>(idB))
+        rbB = _world.getComponent<RigidBodyComponent>(idB);
 
       // Trigger : on previent, on ne resout pas (ni position, ni vitesse).
       if (cc.isTrigger || occ.isTrigger) {

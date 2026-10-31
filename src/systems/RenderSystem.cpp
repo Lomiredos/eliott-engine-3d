@@ -109,30 +109,30 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
 
     // Materiau de l'entite (.mat), sinon couleur unie propre a chaque forme.
     const ee::core::MaterialAsset *asset =
-        matc ? ee::core::getMaterial(stringOf(matc->values, "path")) : nullptr;
+        matc ? ee::core::getMaterial(stringOf(matc->values, "Path")) : nullptr;
     auto matFor = [&](ee::render::Color _fallback) {
       return asset ? renderMaterial(r, *asset) : colorMaterial(_fallback);
     };
 
     if (sp) {
-      float radius = valueOf(sp->values, "radius", 1.0f);
+      float radius = valueOf(sp->values, "Radius", 1.0f);
       ee::render::Vec3 radii{radius * scx, radius * scy, radius * scz};
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), pos, radii, euler,
                  matFor({0.85f, 0.20f, 0.20f}));
     }
 
     if (rp) {
-      ee::render::Vec3 size{valueOf(rp->values, "sizeX", 1.0f) * scx,
-                            valueOf(rp->values, "sizeY", 1.0f) * scy,
-                            valueOf(rp->values, "sizeZ", 1.0f) * scz};
+      ee::render::Vec3 size{valueOf(rp->values, "Size.x", 1.0f) * scx,
+                            valueOf(rp->values, "Size.y", 1.0f) * scy,
+                            valueOf(rp->values, "Size.z", 1.0f) * scz};
       r.drawMesh(r.builtin(ee::render::Prim::Cube), pos, size, euler,
                  matFor({0.85f, 0.20f, 0.20f}));
     }
 
     if (cp) {
 
-      float rad = valueOf(cp->values, "radius", 0.5f);
-      float hgt = valueOf(cp->values, "height", 1.0f);
+      float rad = valueOf(cp->values, "Radius", 0.5f);
+      float hgt = valueOf(cp->values, "Height", 1.0f);
       float rr = rad * scx;
       float hh = hgt * scy;
       ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
@@ -151,7 +151,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     }
 
     if (mp) {
-      std::string path = stringOf(mp->values, "path");
+      std::string path = stringOf(mp->values, "Path");
       ee::core::CpuMesh &cm = ee::core::getMesh(path);
       if (cm.valid) {
         if (cm.gpu == 0)
@@ -164,7 +164,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
 
     if (editorOverlays && pointLight)
       drawLightGizmo(r, pos, euler, false,
-                     valueOf(pointLight->values, "range", 10.0f),
+                     valueOf(pointLight->values, "Range", 10.0f),
                      static_cast<int>(idx) == selected);
     if (editorOverlays && dirLight)
       drawLightGizmo(r, pos, euler, true, 0.0f,
@@ -178,16 +178,16 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
     if (cc && editorOverlays && static_cast<int>(idx) == selected) {
       ColliderWireDesc col;
       col.shape = stringOf(cc->values, "Shape");
-      col.offset = {valueOf(cc->values, "OffSetX", 0.0f),
-                    valueOf(cc->values, "OffSetY", 0.0f),
-                    valueOf(cc->values, "OffSetZ", 0.0f)};
-      col.euler = {valueOf(cc->values, "EulerX", 0.0f),
-                   valueOf(cc->values, "EulerY", 0.0f),
-                   valueOf(cc->values, "EulerZ", 0.0f)};
-      col.radius = valueOf(cc->values, "radius", 1.0f);
-      col.halfExtents = {valueOf(cc->values, "HalfExtentsX", 0.5f),
-                         valueOf(cc->values, "HalfExtentsY", 0.5f),
-                         valueOf(cc->values, "HalfExtentsZ", 0.5f)};
+      col.offset = {valueOf(cc->values, "OffSet.x", 0.0f),
+                    valueOf(cc->values, "OffSet.y", 0.0f),
+                    valueOf(cc->values, "OffSet.z", 0.0f)};
+      col.euler = {valueOf(cc->values, "Euler.x", 0.0f),
+                   valueOf(cc->values, "Euler.y", 0.0f),
+                   valueOf(cc->values, "Euler.z", 0.0f)};
+      col.radius = valueOf(cc->values, "Radius", 1.0f);
+      col.halfExtents = {valueOf(cc->values, "HalfExtents.x", 0.5f),
+                         valueOf(cc->values, "HalfExtents.y", 0.5f),
+                         valueOf(cc->values, "HalfExtents.z", 0.5f)};
       col.height = valueOf(cc->values, "Height", 2.0f);
       drawColliderWire(r, pos, euler, {scx, scy, scz}, col);
     }
@@ -296,9 +296,9 @@ bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out) {
   ee::scene::Xform wx = ee::scene::sceneWorldXforms(scene)[index];
   out = cameraFromTransform({wx.pos.x, wx.pos.y, wx.pos.z},
                             {wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z},
-                            valueOf(cam->values, "fov", 45.0f),
-                            valueOf(cam->values, "nearZ", 0.1f),
-                            valueOf(cam->values, "farZ", 200.0f));
+                            valueOf(cam->values, "Fov", 45.0f),
+                            valueOf(cam->values, "NearZ", 0.1f),
+                            valueOf(cam->values, "FarZ", 200.0f));
   return true;
 }
 
@@ -311,7 +311,7 @@ std::vector<SceneCamera> sceneCameras(const SceneInfo &scene) {
     bool isMain = true;
     for (const auto &ci : scene.entities[i].components)
       if (ci.name == "CameraComponent")
-        isMain = valueOf(ci.values, "isMain", 1.0f) != 0.0f;
+        isMain = valueOf(ci.values, "IsMain", 1.0f) != 0.0f;
     if (isMain)
       active.push_back(sc);
     else if (first.empty())
@@ -390,25 +390,25 @@ ee::render::Lights sceneLights(const SceneInfo &scene) {
       continue;
     for (const auto &ci : scene.entities[i].components) {
       ee::Color3 c;
-      ee::fromHex(stringOf(ci.values, "color"), c);
+      ee::fromHex(stringOf(ci.values, "Color"), c);
       ee::render::Color col{c.r, c.g, c.b};
       if (ci.name == "DirectionalLightComponent" && !sunSet) {
         ee::math::Vector3<float> f = world[i].rot.forward();
         lights.sunDir = {f.x, f.y, f.z};
         lights.sunColor = col;
-        lights.sunIntensity = valueOf(ci.values, "intensity", 2.5f);
-        lights.sunShadows = valueOf(ci.values, "shadows", 1.0f) != 0.0f;
+        lights.sunIntensity = valueOf(ci.values, "Intensity", 2.5f);
+        lights.sunShadows = valueOf(ci.values, "Shadows", 1.0f) != 0.0f;
         sunSet = anyLight = true;
       } else if (ci.name == "PointLightComponent") {
         lights.points.push_back({{world[i].pos.x, world[i].pos.y, world[i].pos.z},
                                  col,
-                                 valueOf(ci.values, "intensity", 5.0f),
-                                 valueOf(ci.values, "range", 10.0f),
-                                 valueOf(ci.values, "shadows", 1.0f) != 0.0f});
+                                 valueOf(ci.values, "Intensity", 5.0f),
+                                 valueOf(ci.values, "Range", 10.0f),
+                                 valueOf(ci.values, "Shadows", 1.0f) != 0.0f});
         anyLight = true;
       } else if (ci.name == "AmbientLightComponent") {
         lights.ambient = col;
-        lights.ambientIntensity = valueOf(ci.values, "intensity", 0.25f);
+        lights.ambientIntensity = valueOf(ci.values, "Intensity", 0.25f);
       }
     }
   }

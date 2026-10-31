@@ -3,6 +3,7 @@ project(ee-core LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20) # eliott-ecs utilise des trucs C++20 (unordered_set::contains)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compile_commands.json pour clangd (cf. .clangd)
 
 # ---------------------------------------------------------------------------
 # Autonome : quand ee-core est le point d'entree (projet etudiant via

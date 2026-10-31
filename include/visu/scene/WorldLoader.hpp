@@ -90,7 +90,7 @@ namespace ee::scene
         _reg.reg<RectComponent>();
         _reg.reg<CapsuleComponent>();
         _reg.reg<MeshComponent>();
-        _reg.reg<RigideBodyComponent>();
+        _reg.reg<RigidBodyComponent>();
         _reg.reg<ColliderComponent>();
         _reg.reg<CameraComponent>();
         _reg.reg<MaterialComponent>();

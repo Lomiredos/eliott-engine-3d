@@ -3,7 +3,7 @@
 #include "ecs/System.hpp"
 #include "ecs/World.hpp"
 
-#include "visu/components/RigideBodyComponent.hpp"
+#include "visu/components/RigidBodyComponent.hpp"
 #include "visu/components/TransformComponent.hpp"
 
 
@@ -14,7 +14,7 @@ class MotionSystem : public ee::ecs::UpdateSystem {
 
 inline void MotionSystem::update(ee::ecs::World& _world, float _dt) {
     for (ee::ecs::EntityID e : m_entities){
-        RigideBodyComponent& rb = *_world.getComponent<RigideBodyComponent>(e);
+        RigidBodyComponent& rb = *_world.getComponent<RigidBodyComponent>(e);
         if (rb.isStatic)
             continue;
         TransformComponent& tf =  *_world.getComponent<TransformComponent>(e);

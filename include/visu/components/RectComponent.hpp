@@ -18,6 +18,6 @@ struct ee::reflection::Reflect<RectComponent>
 
     static void visit(RectComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("size", _c.size);
+        _v.visit("Size", _c.size);
     }
 };

@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 // Soleil : eclaire tout, dans la direction du -Z local de l'entite (comme
-// une camera : EuleurX negatif = vers le bas). La position ne compte pas.
+// une camera : Euler.x negatif = vers le bas). La position ne compte pas.
 struct DirectionalLightComponent
 {
     ee::Color3 color{1.0f, 1.0f, 1.0f};
@@ -39,9 +39,9 @@ struct ee::reflection::Reflect<DirectionalLightComponent>
     static constexpr const char *name = "DirectionalLightComponent";
     static void visit(DirectionalLightComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("color", _c.color);
-        _v.visit("intensity", _c.intensity);
-        _v.visit("shadows", _c.shadows);
+        _v.visit("Color", _c.color);
+        _v.visit("Intensity", _c.intensity);
+        _v.visit("Shadows", _c.shadows);
     }
 };
 
@@ -51,10 +51,10 @@ struct ee::reflection::Reflect<PointLightComponent>
     static constexpr const char *name = "PointLightComponent";
     static void visit(PointLightComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("color", _c.color);
-        _v.visit("intensity", _c.intensity);
-        _v.visit("range", _c.range);
-        _v.visit("shadows", _c.shadows);
+        _v.visit("Color", _c.color);
+        _v.visit("Intensity", _c.intensity);
+        _v.visit("Range", _c.range);
+        _v.visit("Shadows", _c.shadows);
     }
 };
 
@@ -64,7 +64,7 @@ struct ee::reflection::Reflect<AmbientLightComponent>
     static constexpr const char *name = "AmbientLightComponent";
     static void visit(AmbientLightComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("color", _c.color);
-        _v.visit("intensity", _c.intensity);
+        _v.visit("Color", _c.color);
+        _v.visit("Intensity", _c.intensity);
     }
 };

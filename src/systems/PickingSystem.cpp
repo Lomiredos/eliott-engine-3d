@@ -77,7 +77,7 @@ namespace
     bool raySphere(const ee::systems::Ray &_ray, const Vec3 &_center,
                    const Quat &_rot, const Vec3 &_scale, const ComponentInstance &_shape, float &_outT)
     {
-        float R = valueOf(_shape.values, "radius", 1.0f);
+        float R = valueOf(_shape.values, "Radius", 1.0f);
         Vec3 radii{R * _scale.x, R * _scale.y, R * _scale.z};
 
         Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
@@ -105,9 +105,9 @@ namespace
     bool rayBox(const ee::systems::Ray &_ray, const Vec3 &_center,
                 const Quat &_rot, const Vec3 &_scale, const ComponentInstance &_shape, float &_outT)
     {
-        float w = valueOf(_shape.values, "sizeX", 1.0f) * _scale.x;
-        float h = valueOf(_shape.values, "sizeY", 1.0f) * _scale.y;
-        float d = valueOf(_shape.values, "sizeZ", 1.0f) * _scale.z;
+        float w = valueOf(_shape.values, "Size.x", 1.0f) * _scale.x;
+        float h = valueOf(_shape.values, "Size.y", 1.0f) * _scale.y;
+        float d = valueOf(_shape.values, "Size.z", 1.0f) * _scale.z;
 
         // Rotation inverse = conjugue (quaternion unitaire).
         Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
@@ -145,7 +145,7 @@ namespace
     bool rayMesh(const ee::systems::Ray &_ray, const Vec3 &_center,
                  const Quat &_rot, const Vec3 &_scale, const ComponentInstance &_shape, float &_outT)
     {
-        std::string path = stringOf(_shape.values, "path");
+        std::string path = stringOf(_shape.values, "Path");
         const ee::core::CpuMesh &m = ee::core::getMesh(path);
         if (!m.valid)
             return false;
@@ -179,8 +179,8 @@ namespace
     bool rayCapsule(const ee::systems::Ray &_ray, const Vec3 &_center,
                     const Quat &_rot, const Vec3 &_scale, const ComponentInstance &_shape, float &_outT)
     {
-        float rad = valueOf(_shape.values, "radius", 0.5f) * _scale.x;
-        float hgt = valueOf(_shape.values, "height", 1.0f) * _scale.y;
+        float rad = valueOf(_shape.values, "Radius", 0.5f) * _scale.x;
+        float hgt = valueOf(_shape.values, "Height", 1.0f) * _scale.y;
 
         Vec3 up = _rot.rotate({0.0f, 1.0f, 0.0f});
         Vec3 A = _center + up * (hgt * 0.5f);
@@ -248,9 +248,9 @@ namespace
         static const ComponentInstance body = []
         {
             ComponentInstance ci;
-            ci.values["sizeX"] = 0.5f;
-            ci.values["sizeY"] = 0.4f;
-            ci.values["sizeZ"] = 0.8f;
+            ci.values["Size.x"] = 0.5f;
+            ci.values["Size.y"] = 0.4f;
+            ci.values["Size.z"] = 0.8f;
             return ci;
         }();
         return rayBox(_ray, _center, _rot, Vec3{1.0f, 1.0f, 1.0f}, body, _outT);
@@ -263,7 +263,7 @@ namespace
         static const ComponentInstance ball = []
         {
             ComponentInstance ci;
-            ci.values["radius"] = 0.3f;
+            ci.values["Radius"] = 0.3f;
             return ci;
         }();
         return raySphere(_ray, _center, _rot, Vec3{1.0f, 1.0f, 1.0f}, ball, _outT);

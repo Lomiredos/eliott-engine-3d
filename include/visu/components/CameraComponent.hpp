@@ -5,7 +5,7 @@
 
 // Camera du jeu : posee sur une entite qui a un TransformComponent.
 // Position = celle du transform ; elle regarde vers le -Z local de l'entite
-// (EuleurX > 0 leve la vue, EuleurY la tourne ; EuleurZ / roulis ignore).
+// (Euler.x > 0 leve la vue, Euler.y la tourne ; Euler.z / roulis ignore).
 // Plusieurs cameras : la premiere avec isMain gagne, sinon la premiere tout
 // court. Aucune : camera par defaut du runtime.
 struct CameraComponent
@@ -23,9 +23,9 @@ struct ee::reflection::Reflect<CameraComponent>
 
     static void visit(CameraComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("fov", _c.fov);
-        _v.visit("nearZ", _c.nearZ);
-        _v.visit("farZ", _c.farZ);
-        _v.visit("isMain", _c.isMain);
+        _v.visit("Fov", _c.fov);
+        _v.visit("NearZ", _c.nearZ);
+        _v.visit("FarZ", _c.farZ);
+        _v.visit("IsMain", _c.isMain);
     }
 };

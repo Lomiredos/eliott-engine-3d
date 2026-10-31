@@ -1,0 +1,7 @@
+# Base de compilation pour clangd (saut a la definition, autocompletion).
+# Ancestors : clangd remonte les dossiers parents du fichier ouvert et cherche
+# compile_commands.json dans chacun et dans son sous-dossier build/.
+#  - moteur en sous-module de ee-visu -> ee-visu/build/compile_commands.json
+#  - moteur compile seul (cmake -B build) -> build/compile_commands.json
+CompileFlags:
+  CompilationDatabase: Ancestors

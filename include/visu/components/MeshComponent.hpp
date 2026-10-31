@@ -17,6 +17,6 @@ struct ee::reflection::Reflect<MeshComponent>
 
     static void visit(MeshComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("path", _c.path);
+        _v.visit("Path", _c.path);
     }
 };

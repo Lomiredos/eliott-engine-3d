@@ -15,6 +15,6 @@ struct ee::reflection::Reflect<SphereComponent>
 
     static void visit(SphereComponent &_c, ee::reflection::FieldVisitor &_v)
     {
-        _v.visit("radius", _c.radius);
+        _v.visit("Radius", _c.radius);
     }
 };
