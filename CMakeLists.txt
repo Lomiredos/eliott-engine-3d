@@ -5,13 +5,7 @@ set(CMAKE_CXX_STANDARD 20) # eliott-ecs utilise des trucs C++20 (unordered_set::
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compile_commands.json pour clangd (cf. .clangd)
 
-# ---------------------------------------------------------------------------
-# Autonome : quand ee-core est le point d'entree (projet etudiant via
-# eliott-hub), personne d'autre ne fournit glad/glfw/nlohmann_json -> on les
-# fournit nous-memes. Quand ee-core est embarque dans ee-visu (qui les fournit
-# deja via FetchContent/une lib locale), on ne les redefinit pas.
-# ---------------------------------------------------------------------------
-if(NOT TARGET glad::glad)
+if(NOT TARGET glad::glad) #si glaf a déja été definie plus haut (avec un project qui utilise le moteur) pas besoins de le redef
     add_library(glad STATIC extern/glad/src/glad.c)
     target_include_directories(glad PUBLIC extern/glad/include)
     find_package(OpenGL REQUIRED)
@@ -19,7 +13,7 @@ if(NOT TARGET glad::glad)
     add_library(glad::glad ALIAS glad)
 endif()
 
-if(NOT TARGET glfw)
+if(NOT TARGET glfw) #pareil
     include(FetchContent)
     FetchContent_Declare(
         glfw
@@ -32,7 +26,7 @@ if(NOT TARGET glfw)
     FetchContent_MakeAvailable(glfw)
 endif()
 
-if(NOT TARGET nlohmann_json::nlohmann_json)
+if(NOT TARGET nlohmann_json::nlohmann_json) #pareil
     include(FetchContent)
     FetchContent_Declare(
         json
@@ -119,6 +113,7 @@ endif()
 add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
     src/reflect/SceneBind.cpp
+    src/fsm/StateMachineDef.cpp
 )
 
 # ---------------------------------------------------------------------------
