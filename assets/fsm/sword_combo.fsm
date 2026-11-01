@@ -1,0 +1,71 @@
+{
+    "version": 1,
+    "name": "SwordCombo",
+
+    "parameters": [
+        { "name": "attackPressed", "type": "trigger" },
+        { "name": "hit",           "type": "trigger" }
+    ],
+
+    "states": [
+        {
+            "name": "Idle",
+            "action": { "type": "Idle" },
+            "editor": { "x": 0, "y": 0 }
+        },
+        {
+            "name": "Attack1",
+            "action": { "type": "PlayPose", "pose": "slash_right", "duration": 0.5 },
+            "editor": { "x": 250, "y": 0 }
+        },
+        {
+            "name": "Attack2",
+            "action": { "type": "PlayPose", "pose": "slash_left", "duration": 0.5 },
+            "editor": { "x": 500, "y": 0 }
+        },
+        {
+            "name": "Attack3",
+            "action": { "type": "PlayPose", "pose": "thrust", "duration": 0.7 },
+            "editor": { "x": 750, "y": 0 }
+        },
+        {
+            "name": "Hit",
+            "action": { "type": "PlayPose", "pose": "stagger", "duration": 0.4 },
+            "editor": { "x": 375, "y": 200 }
+        }
+    ],
+
+    "entryState": "Idle",
+
+    "transitions": [
+        { "from": "Any", "to": "Hit",
+          "conditions": [ { "param": "hit" } ] },
+
+        { "from": "Hit", "to": "Idle",
+          "conditions": [ { "param": "$stateTime", "op": ">=", "value": 0.4 } ] },
+
+        { "from": "Idle", "to": "Attack1",
+          "conditions": [ { "param": "attackPressed" } ] },
+
+        { "from": "Attack1", "to": "Attack2",
+          "conditions": [
+              { "param": "attackPressed" },
+              { "param": "$stateTime", "op": ">=", "value": 0.2 },
+              { "param": "$stateTime", "op": "<=", "value": 0.5 }
+          ] },
+        { "from": "Attack1", "to": "Idle",
+          "conditions": [ { "param": "$stateTime", "op": ">", "value": 0.5 } ] },
+
+        { "from": "Attack2", "to": "Attack3",
+          "conditions": [
+              { "param": "attackPressed" },
+              { "param": "$stateTime", "op": ">=", "value": 0.2 },
+              { "param": "$stateTime", "op": "<=", "value": 0.5 }
+          ] },
+        { "from": "Attack2", "to": "Idle",
+          "conditions": [ { "param": "$stateTime", "op": ">", "value": 0.5 } ] },
+
+        { "from": "Attack3", "to": "Idle",
+          "conditions": [ { "param": "$stateTime", "op": ">=", "value": 0.7 } ] }
+    ]
+}
