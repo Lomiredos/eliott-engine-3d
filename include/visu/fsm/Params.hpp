@@ -2,6 +2,7 @@
 #include <variant>
 #include <string>
 
+#include "visu/reflect/FieldVisitor.hpp"
 
 
 namespace ee::fsm{
@@ -15,3 +16,11 @@ namespace ee::fsm{
         ParamValue defaultValue;
     };
 }
+
+
+template <>
+struct EnumNames<ee::fsm::ParamValue>
+{
+    static constexpr const char *values[] = {"bool", "float", "int"};
+    static constexpr int count = 3;
+};

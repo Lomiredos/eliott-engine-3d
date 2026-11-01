@@ -115,7 +115,7 @@ add_library(ee-core STATIC
     src/reflect/SceneBind.cpp
     src/fsm/API.cpp
     src/fsm/ConditionRegistry.cpp
-    src/fsm/StateRegistry.cpp
+    src/fsm/ActionRegistry.cpp
     src/fsm/Utils.cpp
 )
 

@@ -73,12 +73,16 @@ namespace {
         assert(_td.targetState >= 0 && _td.targetState < (int)_def.states.size() && "targetState invalid");
         if (_td.targetState < 0 || _td.targetState >= (int)_def.states.size()) return; 
 
-        _def.states[_inst.currentState].state->OnEnd(_ctx);
+        for (auto& a : _def.states[_inst.currentState].actions)
+            a->OnEnd(_ctx);
+    
         resetTrigger(_def, _td, _inst);
         _inst.currentState = _td.targetState;
         _inst.stateTime = 0.f;
-        _def.states[_inst.currentState].state->OnStart(_ctx);
-    }
+    
+        for (auto& a : _def.states[_inst.currentState].actions)
+            a->OnStart(_ctx);
+}
 
 
 }
@@ -109,7 +113,8 @@ void ee::fsm::update(const StateMachineDef &_def, Ctx &_ctx, StateMachineInstanc
         if (_def.entryState < 0 || _def.entryState >= (int)_def.states.size()) return; 
 
         _inst.currentState = _def.entryState;
-        _def.states[_inst.currentState].state->OnStart(_ctx);
+        for (auto& a : _def.states[_inst.currentState].actions)
+            a->OnStart(_ctx);
         _inst.stateTime = 0.f;
         return;
     }
@@ -139,7 +144,8 @@ void ee::fsm::update(const StateMachineDef &_def, Ctx &_ctx, StateMachineInstanc
         }
     }
     //update 
-    _def.states[_inst.currentState].state->OnUpdate(_ctx, _dt);
+    for (auto& a : _def.states[_inst.currentState].actions)
+        a->OnUpdate(_ctx, _dt, _inst.stateTime);
     _inst.stateTime += _dt;
 
 }

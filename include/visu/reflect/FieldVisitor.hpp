@@ -6,13 +6,15 @@
 #include "visu/core/Color3.hpp"
 #include "visu/core/EntityRef.hpp"
 #include "visu/reflect/Reflect.hpp"
+#include "visu/reflect/Utils.hpp"
 
 #include <string>
 
 #include <cstddef>
 #include <type_traits>
+#include <utility>
 #include <vector>
-
+#include <variant>
 
 
 template <typename E>
@@ -95,6 +97,32 @@ namespace ee::reflection
             _value = static_cast<E>(raw);
         }
 
+
+    struct GroupScope{
+        [[nodiscard]] GroupScope(FieldVisitor &_v, const char *_name) : v(_v) {v.beginGroup(_name);}
+        ~GroupScope() {v.endGroup();}
+        GroupScope(const GroupScope &) = delete;
+        GroupScope &operator=(const GroupScope &) = delete;
+
+        private:
+        FieldVisitor &v;
+
+    };
+
+        template<typename... Ts>
+        void visit(const char *_name, std::variant<Ts...> &_value){
+            using V = std::variant<Ts...>;
+            static_assert(EnumNames<V>::count == sizeof...(Ts), "EnumNames, il faut un nom par altérnative du variant"); //sizeof...(Ts) != sizeof(int) ca donne juste le nombre de type dans Ts
+            static_assert(EnumNames<V>::count == std::size(EnumNames<V>::values), "EnumNames, count est different du nombre de valeur possible");
+
+            GroupScope g(*this, _name);
+            int idx = (int)_value.index();
+            visitEnum("type", idx, EnumNames<V>::values, EnumNames<V>::count);
+            if (idx >= 0 && idx < (int)sizeof...(Ts) && idx != (int)_value.index())
+                ee::reflection::emplaceByIndex(_value, (std::size_t)idx, std::index_sequence_for<Ts...>());
+            std::visit([&](auto &x){this->visit("value", x);}, _value);
+        }
+
         template <typename T>
         void visit(const char *_name, std::vector<T> &_value){
             static_assert(!std::is_same_v<T, bool>, "std::vector<bool> non supporter, utilise des char ou des int plutot stp");
@@ -115,16 +143,6 @@ namespace ee::reflection
     };
 
 
-    struct GroupScope{
-        [[nodiscard]] GroupScope(FieldVisitor &_v, const char *_name) : v(_v) {v.beginGroup(_name);}
-        ~GroupScope() {v.endGroup();}
-        GroupScope(const GroupScope &) = delete;
-        GroupScope &operator=(const GroupScope &) = delete;
-
-        private:
-        FieldVisitor &v;
-
-    };
 
     template <typename S>
         requires Reflectable<S>

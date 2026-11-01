@@ -11,19 +11,19 @@
 
 namespace ee::fsm {
 
-    class State
+    class Action
     {
     public:
-        virtual ~State() = default;
-        virtual void OnStart(Ctx& _owner) = 0;
-        virtual void OnUpdate(Ctx& _owner, float _dt) = 0; // no const because it may modifie owner
-        virtual void OnEnd(Ctx& _owner) = 0;
+        virtual ~Action() = default;
+        virtual void OnStart(Ctx&){}
+        virtual void OnUpdate(Ctx& , float /*_dt*/, float /*_stateTime*/) {}  // no const because it may modifie ctx
+        virtual void OnEnd(Ctx&){}
         virtual void VisitParams(ee::reflection::FieldVisitor&) {}
     };
 
     struct StateDef{
         std::string name;
-        std::unique_ptr<State> state;
+        std::vector<std::unique_ptr<Action>> actions;
         std::vector<TransitionDef> transition;
     };
 
