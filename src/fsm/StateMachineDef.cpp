@@ -303,3 +303,15 @@ int ee::fsm::getInt(const StateMachineDef &_def, const StateMachineInstance &_in
 bool ee::fsm::getTrigger(const StateMachineDef &_def, const StateMachineInstance &_inst, int _index){
     return getParam<bool>(_def, _inst, _index, ParamType::Trigger);
 }
+
+void ee::fsm::ConditionRegistry::reg(const std::string &_name, ConditionFn _cfn)
+{
+    if (m_functions.count(_name))
+        std::fprintf(stderr, "[fsm] condition \"%s\" enregistrée deux fois, la seconde remplace la première\n", _name.c_str());
+    m_functions[_name] = _cfn;
+}
+ConditionFn ee::fsm::ConditionRegistry::find(const std::string &_name) const
+{
+    auto it = m_functions.find(_name);
+    return it == m_functions.end() ? nullptr : it->second;
+}

@@ -1,6 +1,7 @@
 #pragma once
 #include "StateMachine.hpp"
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include <variant>
 #include <string>
@@ -64,6 +65,15 @@ namespace ee::fsm {
         std::vector<ParamValue> params;
     };
 
+
+    class ConditionRegistry{
+        std::unordered_map<std::string, ConditionFn> m_functions;
+        
+    public:
+        void reg(const std::string& _name, ConditionFn _cfn);
+        ConditionFn find(const std::string &_name) const;
+        
+    };
 
     int findParam(const StateMachineDef &_def, const std::string &_name);
 
