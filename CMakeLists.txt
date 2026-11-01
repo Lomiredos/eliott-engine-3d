@@ -113,7 +113,10 @@ endif()
 add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
     src/reflect/SceneBind.cpp
-    src/fsm/StateMachineDef.cpp
+    src/fsm/API.cpp
+    src/fsm/ConditionRegistry.cpp
+    src/fsm/StateRegistry.cpp
+    src/fsm/Utils.cpp
 )
 
 # ---------------------------------------------------------------------------

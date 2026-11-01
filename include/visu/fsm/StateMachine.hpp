@@ -1,21 +1,24 @@
 #pragma once
 
-#include "ecs/World.hpp"
+#include <vector>
 
-namespace ee::fsm {
+#include "visu/fsm/State.hpp"
+#include "visu/fsm/Params.hpp"
 
-    struct Ctx{
-        ee::ecs::World&   world; 
-        ee::ecs::EntityID entity;
+namespace ee::fsm {    
+    
+    struct StateMachineDef {
+        std::vector<StateDef> states;
+        std::vector<TransitionDef> anyTransition;
+        std::vector<ParamDef> params;
+        int entryState = 0;
     };
 
-    class State
-    {
-    public:
-        virtual ~State() = default;
-        virtual void OnStart(Ctx& _owner) = 0;
-        virtual void OnUpdate(Ctx& _owner, float _dt) = 0; // no const because it may modifie owner
-        virtual void OnEnd(Ctx& _owner) = 0;
+    struct StateMachineInstance{
+        const StateMachineDef* initializedWith = nullptr;
+        int currentState = -1;
+        float stateTime = 0.f;
+        std::vector<ParamValue> params;
     };
 
-} //namespace ee::fsm
+}
