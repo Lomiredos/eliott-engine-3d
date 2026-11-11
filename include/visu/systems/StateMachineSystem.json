@@ -1,0 +1,8 @@
+{
+  "category": "engine",
+  "components": [
+    "StateMachineComponent"
+  ],
+  "name": "StateMachineSystem",
+  "priority": 50
+}

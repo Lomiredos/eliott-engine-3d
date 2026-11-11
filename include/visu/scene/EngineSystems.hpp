@@ -8,6 +8,7 @@
 #include "visu/systems/GravitySystem.hpp"
 #include "visu/systems/MotionSystem.hpp"
 #include "visu/systems/CollisionSystem.hpp"
+#include "visu/systems/StateMachineSystem.hpp"
 
 #include <optional>
 #include <vector>
@@ -18,6 +19,7 @@ namespace ee::scene {
         _host.reg("GravitySystem", makeSystemFactory<GravitySystem>());
         _host.reg("MotionSystem", makeSystemFactory<MotionSystem>());
         _host.reg("CollisionSystem", makeSystemFactory<CollisionSystem>());
+        _host.reg("StateMachineSystem", makeSystemFactory<StateMachineSystem>());
     }
 
     // Signature + priorite des systemes moteur : lues depuis leurs sidecars

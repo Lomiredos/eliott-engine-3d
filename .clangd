@@ -5,3 +5,24 @@
 #  - moteur compile seul (cmake -B build) -> build/compile_commands.json
 CompileFlags:
   CompilationDatabase: Ancestors
+
+---
+If:
+  PathMatch: .*\.(hpp|h|inl)
+CompileFlags:
+  Add:
+    - -xc++-header
+    - -std=gnu++20
+    - -I../include
+    - -I../extern/eliott-math/include
+    - -I../extern/eliott-input/include
+    - -I../extern/eliott-ecs/include
+    - -I../extern/glad/include
+    - -I../extern/eliott-engine-3d/include
+    - -I../extern/eliott-engine-3d/extern/eliott-math/include
+    - -I../extern/eliott-engine-3d/extern/eliott-input/include
+    - -I../extern/eliott-engine-3d/extern/eliott-ecs/include
+    - -I../extern/eliott-engine-3d/extern/glad/include
+    - -I_deps/json-src/include
+    - -I_deps/glfw-src/include
+    - -Igenerated

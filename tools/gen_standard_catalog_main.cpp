@@ -18,5 +18,6 @@ int main(int argc, char ** argv){
     ee::reflection::emitComponent<DirectionalLightComponent>(comps);
     ee::reflection::emitComponent<PointLightComponent>(comps);
     ee::reflection::emitComponent<AmbientLightComponent>(comps);
+    ee::reflection::emitComponent<StateMachineComponent>(comps);
     ee::reflection::writeCatalog(comps, argv[1]);
 }

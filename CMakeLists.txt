@@ -110,9 +110,7 @@ if(NOT EE_BUILD_RUNTIME)
     return()
 endif()
 
-add_library(ee-core STATIC
-    src/systems/SystemScheduler.cpp
-    src/reflect/SceneBind.cpp
+add_library(ee-fsm STATIC
     src/reflect/JsonReadVisitor.cpp
     src/reflect/JsonWriteVisitor.cpp
     src/fsm/API.cpp
@@ -120,6 +118,17 @@ add_library(ee-core STATIC
     src/fsm/ActionRegistry.cpp
     src/fsm/Utils.cpp
     src/fsm/FsmStore.cpp
+    src/fsm/EntityAPI.cpp
+)
+target_link_libraries(ee-fsm PUBLIC
+    ee-format
+    ee-reflect
+    eliott-ecs
+)
+
+add_library(ee-core STATIC
+    src/systems/SystemScheduler.cpp
+    src/reflect/SceneBind.cpp
 )
 
 # ---------------------------------------------------------------------------
@@ -153,9 +162,38 @@ add_subdirectory(extern/eliott-input)
 target_link_libraries(ee-core PUBLIC
     ee-render
     ee-reflect
+    ee-fsm
     eliott-ecs
     eliott-input
 )
+
+option(EE_BUILD_TESTS "Construit les tests unitaires (ctest)" ${PROJECT_IS_TOP_LEVEL})
+if(EE_BUILD_TESTS)
+    find_package(doctest CONFIG QUIET)
+    if(NOT doctest_FOUND)
+        include(FetchContent)
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        FetchContent_Declare(
+            doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG v2.4.12
+        )
+        set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(doctest)
+    endif()
+
+    enable_testing()
+    add_executable(ee-fsm-tests
+        tests/fsm/main.cpp
+        tests/fsm/test_runtime.cpp
+        tests/fsm/test_loader.cpp
+        tests/fsm/test_store.cpp
+        tests/fsm/test_sword_combo.cpp
+    )
+    target_link_libraries(ee-fsm-tests PRIVATE ee-fsm doctest::doctest)
+    target_compile_definitions(ee-fsm-tests PRIVATE EE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME ee-fsm-tests COMMAND ee-fsm-tests)
+endif()
 
 # ---------------------------------------------------------------------------
 # Outil de regeneration du catalogue de composants du PROJET (jamais dans

@@ -10,3 +10,4 @@
 #include "visu/components/CameraComponent.hpp"
 #include "visu/components/MaterialComponent.hpp"
 #include "visu/components/LightComponents.hpp"
+#include "visu/components/StateMachineComponent.hpp"

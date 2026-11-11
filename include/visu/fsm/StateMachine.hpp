@@ -5,6 +5,7 @@
 
 #include "visu/fsm/State.hpp"
 #include "visu/fsm/Params.hpp"
+#include "visu/fsm/Instance.hpp"
 
 namespace ee::fsm {    
     
@@ -16,11 +17,5 @@ namespace ee::fsm {
         int entryState = 0;
     };
 
-    struct StateMachineInstance{
-        const StateMachineDef* initializedWith = nullptr;
-        int currentState = -1;
-        float stateTime = 0.f;
-        std::vector<ParamValue> params;
-    };
 
 }

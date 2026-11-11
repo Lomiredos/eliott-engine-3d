@@ -5,11 +5,9 @@
 
 #include <string>
 
-// Materiau (.mat, voir MaterialStore.hpp) des formes de l'entite (Sphere,
-// Rect, Capsule, Mesh). Sans lui : couleur par defaut de la forme.
 struct MaterialComponent
 {
-    std::string path; // ex. "Assets/Materials/Brique.mat"
+    std::string path;
 };
 
 template <>
