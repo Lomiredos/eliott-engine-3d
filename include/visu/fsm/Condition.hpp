@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <variant>
 
 #include "visu/fsm/Operation.hpp"
@@ -24,6 +25,7 @@ namespace ee::fsm {
     struct CustomCondition {
         ConditionFn fn;
         bool expected;
+        std::string name;
     };
 
     using ConditionDef = std::variant<ParamCondition, StateTimeCondition, CustomCondition>;

@@ -1,5 +1,7 @@
 #include "visu/fsm/ActionRegistry.hpp"
 #include "visu/fsm/State.hpp"
+#include "visu/fsm/IdleAction.hpp"
+#include "visu/fsm/SetParamAction.hpp"
 
 #include <cstdio>
 
@@ -15,4 +17,18 @@ std::unique_ptr<ee::fsm::Action> ee::fsm::ActionRegistry::create(const std::stri
 {
     auto it = m_actionFactorys.find(_name);
     return it == m_actionFactorys.end() ? nullptr : it->second();
+}
+
+void ee::fsm::registerEngineActions(ActionRegistry& _registry){
+    _registry.reg("SetParam", makeActionFactory<SetParamAction>());
+    _registry.reg("Idle",     makeActionFactory<IdleAction>());
+}
+
+ee::fsm::ActionRegistry& ee::fsm::actionRegistry(){
+    static ActionRegistry registry = []{
+        ActionRegistry r;
+        registerEngineActions(r);
+        return r;
+    }();
+    return registry;
 }

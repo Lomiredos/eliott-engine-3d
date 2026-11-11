@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "visu/fsm/State.hpp"
@@ -8,6 +9,7 @@
 namespace ee::fsm {    
     
     struct StateMachineDef {
+        std::string name;
         std::vector<StateDef> states;
         std::vector<TransitionDef> anyTransition;
         std::vector<ParamDef> params;

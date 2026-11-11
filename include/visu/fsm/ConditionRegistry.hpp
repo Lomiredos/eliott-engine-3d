@@ -14,4 +14,6 @@ namespace ee::fsm{
         ConditionFn find(const std::string &_name) const;
 
     };
+
+    ConditionRegistry& conditionRegistry();
 }

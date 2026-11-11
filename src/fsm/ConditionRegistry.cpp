@@ -13,3 +13,8 @@ ee::fsm::ConditionFn ee::fsm::ConditionRegistry::find(const std::string &_name) 
     auto it = m_functions.find(_name);
     return it == m_functions.end() ? nullptr : it->second;
 }
+
+ee::fsm::ConditionRegistry& ee::fsm::conditionRegistry(){
+    static ConditionRegistry registry;
+    return registry;
+}

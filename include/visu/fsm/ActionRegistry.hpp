@@ -28,4 +28,7 @@ namespace ee::fsm {
 
 };
 
+void registerEngineActions(ActionRegistry& _registry);
+
+ActionRegistry& actionRegistry();
 }

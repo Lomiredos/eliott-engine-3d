@@ -1,36 +1,59 @@
 {
-    "version": 1,
+    "version": 2,
     "name": "SwordCombo",
 
     "parameters": [
         { "name": "attackPressed", "type": "trigger" },
-        { "name": "hit",           "type": "trigger" }
+        { "name": "hit",           "type": "trigger" },
+        { "name": "canMove",       "type": "bool", "default": true }
     ],
 
     "states": [
         {
             "name": "Idle",
-            "action": { "type": "Idle" },
+            "actions": [
+                { "type": "SetParam", "param": "canMove", "value": { "type": "bool", "value": true } },
+                { "type": "PlayPose", "pose": "guard", "duration": 0.0 }
+            ],
             "editor": { "x": 0, "y": 0 }
         },
         {
             "name": "Attack1",
-            "action": { "type": "PlayPose", "pose": "slash_right", "duration": 0.5 },
+            "actions": [
+                { "type": "SetParam", "param": "canMove", "value": { "type": "bool", "value": false } },
+                { "type": "PlayPose", "pose": "slash_right", "duration": 0.5 },
+                { "type": "SpawnHitbox", "start": 0.1, "end": 0.25, "damage": 10, "range": 1.5 },
+                { "type": "PlaySound", "sound": "assets/sounds/swing_1.wav" }
+            ],
             "editor": { "x": 250, "y": 0 }
         },
         {
             "name": "Attack2",
-            "action": { "type": "PlayPose", "pose": "slash_left", "duration": 0.5 },
+            "actions": [
+                { "type": "SetParam", "param": "canMove", "value": { "type": "bool", "value": false } },
+                { "type": "PlayPose", "pose": "slash_left", "duration": 0.5 },
+                { "type": "SpawnHitbox", "start": 0.1, "end": 0.25, "damage": 12, "range": 1.5 },
+                { "type": "PlaySound", "sound": "assets/sounds/swing_2.wav" }
+            ],
             "editor": { "x": 500, "y": 0 }
         },
         {
             "name": "Attack3",
-            "action": { "type": "PlayPose", "pose": "thrust", "duration": 0.7 },
+            "actions": [
+                { "type": "SetParam", "param": "canMove", "value": { "type": "bool", "value": false } },
+                { "type": "PlayPose", "pose": "thrust", "duration": 0.7 },
+                { "type": "SpawnHitbox", "start": 0.25, "end": 0.4, "damage": 25, "range": 2.0 },
+                { "type": "PlaySound", "sound": "assets/sounds/thrust.wav" }
+            ],
             "editor": { "x": 750, "y": 0 }
         },
         {
             "name": "Hit",
-            "action": { "type": "PlayPose", "pose": "stagger", "duration": 0.4 },
+            "actions": [
+                { "type": "SetParam", "param": "canMove", "value": { "type": "bool", "value": false } },
+                { "type": "PlayPose", "pose": "stagger", "duration": 0.4 },
+                { "type": "PlaySound", "sound": "assets/sounds/hurt.wav" }
+            ],
             "editor": { "x": 375, "y": 200 }
         }
     ],

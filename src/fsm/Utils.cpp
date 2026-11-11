@@ -73,15 +73,15 @@ namespace {
         assert(_td.targetState >= 0 && _td.targetState < (int)_def.states.size() && "targetState invalid");
         if (_td.targetState < 0 || _td.targetState >= (int)_def.states.size()) return; 
 
-        for (auto& a : _def.states[_inst.currentState].actions)
-            a->OnEnd(_ctx);
+        for (const ActionEntry& e : _def.states[_inst.currentState].actions)
+            if (e.action) e.action->OnEnd(_ctx);
     
         resetTrigger(_def, _td, _inst);
         _inst.currentState = _td.targetState;
         _inst.stateTime = 0.f;
     
-        for (auto& a : _def.states[_inst.currentState].actions)
-            a->OnStart(_ctx);
+        for (const ActionEntry& e : _def.states[_inst.currentState].actions)
+            if (e.action) e.action->OnStart(_ctx);
 }
 
 
@@ -106,6 +106,9 @@ int ee::fsm::findParam(const StateMachineDef &_def, const std::string &_name) {
     
 void ee::fsm::update(const StateMachineDef &_def, Ctx &_ctx, StateMachineInstance &_inst, float _dt){
 
+    if (_inst.initializedWith != &_def)
+        initInstance(_def, _inst);
+
     //init
     if (_inst.currentState == -1){
         
@@ -113,8 +116,8 @@ void ee::fsm::update(const StateMachineDef &_def, Ctx &_ctx, StateMachineInstanc
         if (_def.entryState < 0 || _def.entryState >= (int)_def.states.size()) return; 
 
         _inst.currentState = _def.entryState;
-        for (auto& a : _def.states[_inst.currentState].actions)
-            a->OnStart(_ctx);
+        for (const ActionEntry& e : _def.states[_inst.currentState].actions)
+            if (e.action) e.action->OnStart(_ctx);
         _inst.stateTime = 0.f;
         return;
     }
@@ -144,8 +147,8 @@ void ee::fsm::update(const StateMachineDef &_def, Ctx &_ctx, StateMachineInstanc
         }
     }
     //update 
-    for (auto& a : _def.states[_inst.currentState].actions)
-        a->OnUpdate(_ctx, _dt, _inst.stateTime);
+    for (const ActionEntry& e : _def.states[_inst.currentState].actions)
+        if (e.action) e.action->OnUpdate(_ctx, _dt, _inst.stateTime);
     _inst.stateTime += _dt;
 
 }
