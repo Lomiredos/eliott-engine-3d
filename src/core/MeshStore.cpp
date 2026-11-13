@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 namespace {
-std::filesystem::path g_baseDir;
+    std::filesystem::path g_baseDir;
 }
 
 namespace {
@@ -133,25 +133,30 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
 } // namespace
 
 namespace ee::core {
-void setMeshBaseDir(const std::filesystem::path &_dir) { g_baseDir = _dir; }
 
-std::filesystem::path assetPath(const std::string &_path) {
-  std::filesystem::path p(_path);
-  return (p.is_absolute() || _path.empty()) ? p : g_baseDir / p;
-}
+    void setMeshBaseDir(const std::filesystem::path& _dir) { g_baseDir = _dir; }
 
-CpuMesh &getMesh(const std::string &_path) {
-  static std::unordered_map<std::string, CpuMesh> cache;
+    std::filesystem::path assetPath(const std::string& _path) {
+        std::filesystem::path path(_path);
 
-  std::filesystem::path p(_path);
-  std::filesystem::path full =
-      (p.is_absolute() || _path.empty()) ? p : g_baseDir / p;
-  std::string key = full.string();
+        if (_path.empty()) return path;
 
-  auto it = cache.find(key);
-  if (it != cache.end())
-    return it->second;
-  auto res = cache.emplace(key, loadObj(key));
-  return res.first->second;
-}
+        return (path.is_absolute() ? path : g_baseDir / path).lexically_normal();
+    }
+
+    CpuMesh& getMesh(const std::string& _path) {
+
+        static std::unordered_map<std::string, CpuMesh> cache;
+
+        std::string key = assetPath(_path).string();
+        if (key == "") {
+            static CpuMesh emptyMesh;
+            return emptyMesh;
+        }
+
+        auto it = cache.find(key);
+        if (it != cache.end()) return it->second;
+        auto res = cache.emplace(key, loadObj(key));
+        return res.first->second;
+    }
 } // namespace ee::core

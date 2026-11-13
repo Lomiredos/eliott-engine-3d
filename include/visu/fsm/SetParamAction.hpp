@@ -39,7 +39,9 @@ namespace ee::fsm {
                 }
 
                 case ee::fsm::ParamType::Trigger: {
-                    ee::fsm::setTrigger(_ctx.def, _ctx.inst, index);
+                    const bool* v = std::get_if<bool>(&m_value);
+                    if (v && !*v) ee::fsm::resetTrigger(_ctx.def, _ctx.inst, index);
+                    else          ee::fsm::setTrigger(_ctx.def, _ctx.inst, index);
                     break;
                 }
             }

@@ -21,71 +21,22 @@
 #include <variant>
 #include <vector>
 
-
-
-
-namespace ee::scene
-{
-    using Vec3f = ee::math::Vector3<float>;
-    using Quat = ee::math::Quaternion;
-
+namespace ee::scene {
     struct Xform
     {
-        Vec3f pos{0.0f, 0.0f, 0.0f};
-        Quat rot{1.0f, 0.0f, 0.0f, 0.0f};
-        Vec3f scale{1.0f, 1.0f, 1.0f};
-        // Rotation en degres (X, Y, Z) ; pour une racine, les valeurs du
-        // transform telles quelles (pas de conversion).
-        Vec3f eulerDeg{0.0f, 0.0f, 0.0f};
+        ee::math::Vector3<float> pos;
+        ee::math::Quaternion rot;
+        ee::math::Vector3<float> scale{1.0f, 1.0f, 1.0f};
+
+        ee::math::Vector3<float> eulerDeg;
     };
 
-    // Angles d'Euler (degres, X Y Z) d'un quaternion, meme convention que
-    // Quaternion::fromEulerDeg (q = qz*qy*qx).
-    // Calcul via la matrice R = Rz * Ry * Rx, en double. Y est l'angle du
-    // milieu : a Y = +-90 (blocage de cardan) X et Z tournent autour du meme
-    // axe et les formules generales divisent 0 par 0 ; on pose alors Z = 0
-    // et on met toute la rotation restante dans X.
-    inline Vec3f eulerDegFromQuat(const Quat &_q)
-    {
-        const double w = _q.w, x = _q.x, y = _q.y, z = _q.z;
-        const double r00 = 1.0 - 2.0 * (y * y + z * z);
-        const double r01 = 2.0 * (x * y - w * z);
-        const double r02 = 2.0 * (x * z + w * y);
-        const double r10 = 2.0 * (x * y + w * z);
-        const double r20 = 2.0 * (x * z - w * y);
-        const double r21 = 2.0 * (y * z + w * x);
-        const double r22 = 1.0 - 2.0 * (x * x + y * y);
-
-        double ax, ay, az;
-        if (r20 <= -0.999999) // Y = +90
-        {
-            ay = 3.14159265358979323846 / 2.0;
-            az = 0.0;
-            ax = std::atan2(r01, r02);
-        }
-        else if (r20 >= 0.999999) // Y = -90
-        {
-            ay = -3.14159265358979323846 / 2.0;
-            az = 0.0;
-            ax = std::atan2(-r01, -r02);
-        }
-        else
-        {
-            ay = std::asin(-r20);
-            ax = std::atan2(r21, r22);
-            az = std::atan2(r10, r00);
-        }
-        const double toDeg = 180.0 / 3.14159265358979323846;
-        return {static_cast<float>(ax * toDeg), static_cast<float>(ay * toDeg),
-                static_cast<float>(az * toDeg)};
-    }
-
-    inline Xform makeXform(Vec3f _pos, Vec3f _eulerDeg, Vec3f _scale)
-    {
+    inline Xform makeXform(ee::math::Vector3<float> _pos, ee::math::Vector3<float> _eulerDeg,
+                           ee::math::Vector3<float> _scale) {
         Xform x;
         x.pos = _pos;
         x.eulerDeg = _eulerDeg;
-        x.rot = Quat::fromEulerDeg(_eulerDeg.x, _eulerDeg.y, _eulerDeg.z);
+        x.rot = ee::math::Quaternion::fromEulerDeg(_eulerDeg);
         x.scale = _scale;
         return x;
     }
@@ -97,7 +48,7 @@ namespace ee::scene
         w.pos = _parent.pos + _parent.rot.rotate(_local.pos * _parent.scale);
         w.rot = _parent.rot * _local.rot;
         w.scale = _parent.scale * _local.scale;
-        w.eulerDeg = eulerDegFromQuat(w.rot);
+        w.eulerDeg = w.rot.toEulerDeg();
         return w;
     }
 
@@ -106,8 +57,8 @@ namespace ee::scene
     {
         auto safeDiv = [](float _a, float _b)
         { return std::fabs(_b) > 1e-6f ? _a / _b : _a; };
-        Quat inv{_parent.rot.w, -_parent.rot.x, -_parent.rot.y, -_parent.rot.z};
-        Vec3f p = inv.rotate(_world.pos - _parent.pos);
+        ee::math::Quaternion inv{_parent.rot.w, -_parent.rot.x, -_parent.rot.y, -_parent.rot.z};
+        ee::math::Vector3<float> p = inv.rotate(_world.pos - _parent.pos);
 
         Xform l;
         l.pos = {safeDiv(p.x, _parent.scale.x), safeDiv(p.y, _parent.scale.y),
@@ -115,7 +66,7 @@ namespace ee::scene
         l.rot = inv * _world.rot;
         l.scale = {safeDiv(_world.scale.x, _parent.scale.x), safeDiv(_world.scale.y, _parent.scale.y),
                    safeDiv(_world.scale.z, _parent.scale.z)};
-        l.eulerDeg = eulerDegFromQuat(l.rot);
+        l.eulerDeg = l.rot.toEulerDeg();
         return l;
     }
 
@@ -157,15 +108,14 @@ namespace ee::scene
             return std::string(_group) + "." + _field;
         }
 
-        inline Vec3f readVec3(const ComponentInstance &_c, const char *_name, Vec3f _def)
-        {
+        inline ee::math::Vector3<float> readVec3(const ComponentInstance& _c, const char* _name,
+                                                 ee::math::Vector3<float> _def) {
             return {detail::num(_c, fieldKey(_name, "x"), _def.x),
                     detail::num(_c, fieldKey(_name, "y"), _def.y),
                     detail::num(_c, fieldKey(_name, "z"), _def.z)};
         }
 
-        inline void writeVec3(ComponentInstance &_c, const char *_name, const Vec3f &_v)
-        {
+        inline void writeVec3(ComponentInstance& _c, const char* _name, const ee::math::Vector3<float>& _v) {
             _c.values[fieldKey(_name, "x")] = _v.x;
             _c.values[fieldKey(_name, "y")] = _v.y;
             _c.values[fieldKey(_name, "z")] = _v.z;
@@ -179,9 +129,8 @@ namespace ee::scene
         if (!tf)
             return {};
         using detail::num;
-        return makeXform(detail::readVec3(*tf, "Position", {0, 0, 0}),
-                        detail::readVec3(*tf, "Euler", {0, 0, 0}),
-                        detail::readVec3(*tf, "Scale", {1, 1, 1}));
+        return makeXform(detail::readVec3(*tf, "Position", {0, 0, 0}), detail::readVec3(*tf, "Euler", {0, 0, 0}),
+                         detail::readVec3(*tf, "Scale", {1, 1, 1}));
     }
 
     // Parent declare (index), -1 si aucun ou invalide (hors scene, sans Transform).
@@ -291,4 +240,4 @@ namespace ee::scene
         tf->values["Parent"] = _newParent;
         return true;
     }
-}
+} // namespace ee::scene

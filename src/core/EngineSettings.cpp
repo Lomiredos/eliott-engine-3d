@@ -15,12 +15,12 @@ namespace ee::core
         const ee::render::RenderSettings &r = _s.render;
         nlohmann::json j;
         j["render"]["maxPointLights"] = r.maxPointLights;
-        j["render"]["sunShadows"] = r.sunShadows;
-        j["render"]["sunShadowResolution"] = r.sunShadowResolution;
-        j["render"]["sunShadowDistance"] = r.sunShadowDistance;
-        j["render"]["pointShadows"] = r.pointShadows;
-        j["render"]["maxShadowedPointLights"] = r.maxShadowedPointLights;
-        j["render"]["pointShadowResolution"] = r.pointShadowResolution;
+        j["render"]["sunShadows"] = r.sun.enable;
+        j["render"]["sunShadowResolution"] = r.sun.resolution;
+        j["render"]["sunShadowDistance"] = r.sun.distance;
+        j["render"]["pointShadows"] = r.point.enable;
+        j["render"]["maxShadowedPointLights"] = r.point.maxLight;
+        j["render"]["pointShadowResolution"] = r.point.resolution;
         return j.dump(2) + "\n";
     }
 
@@ -44,12 +44,12 @@ namespace ee::core
             }
         };
         read("maxPointLights", r.maxPointLights);
-        read("sunShadows", r.sunShadows);
-        read("sunShadowResolution", r.sunShadowResolution);
-        read("sunShadowDistance", r.sunShadowDistance);
-        read("pointShadows", r.pointShadows);
-        read("maxShadowedPointLights", r.maxShadowedPointLights);
-        read("pointShadowResolution", r.pointShadowResolution);
+        read("sunShadows", r.sun.enable);
+        read("sunShadowResolution", r.sun.resolution);
+        read("sunShadowDistance", r.sun.distance);
+        read("pointShadows", r.point.enable);
+        read("maxShadowedPointLights", r.point.maxLight);
+        read("pointShadowResolution", r.point.resolution);
         return s;
     }
 

@@ -116,12 +116,46 @@ namespace ee::ipc
 
     inline nlohmann::json msgStop() { return {{"t", "stop"}}; }
 
+    // Modifie un parametre de la machine a etats d'une entite (index = celui de la scene).
+    // Trigger : true = setTrigger, false = resetTrigger.
+    inline nlohmann::json msgFsmSet(int _entity, const std::string &_param, const nlohmann::json &_value)
+    {
+        return {{"t", "fsmset"}, {"e", _entity}, {"p", _param}, {"v", _value}};
+    }
+
     // --- jeu -> editeur ---
     inline nlohmann::json msgReady() { return {{"t", "ready"}}; }
 
-    inline nlohmann::json msgSnapshot(const SceneInfo &_scene)
+    struct FsmLiveState
     {
-        return {{"t", "snap"}, {"scene", sceneToJson(_scene)}};
+        int entity = -1;
+        std::string path;
+        std::string state;
+        nlohmann::json params = nlohmann::json::object();
+    };
+
+    inline nlohmann::json msgSnapshot(const SceneInfo &_scene, const std::vector<FsmLiveState> &_fsm = {})
+    {
+        nlohmann::json j = {{"t", "snap"}, {"scene", sceneToJson(_scene)}};
+        if (!_fsm.empty())
+        {
+            j["fsm"] = nlohmann::json::array();
+            for (const FsmLiveState &f : _fsm)
+                j["fsm"].push_back({{"e", f.entity}, {"path", f.path}, {"state", f.state}, {"params", f.params}});
+        }
+        return j;
+    }
+
+    inline std::vector<FsmLiveState> fsmStatesFromMsg(const nlohmann::json &_j)
+    {
+        std::vector<FsmLiveState> out;
+        if (!_j.contains("fsm") || !_j["fsm"].is_array())
+            return out;
+        for (const nlohmann::json &f : _j["fsm"])
+            if (f.is_object())
+                out.push_back({f.value("e", -1), f.value("path", std::string()), f.value("state", std::string()),
+                               f.contains("params") && f["params"].is_object() ? f["params"] : nlohmann::json::object()});
+        return out;
     }
 
     inline std::string msgType(const nlohmann::json &_j) { return _j.value("t", ""); }

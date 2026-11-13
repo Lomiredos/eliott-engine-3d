@@ -1,4 +1,7 @@
 #include "visu/render/GLRenderer.hpp"
+#include "math/Vector3.hpp"
+#include "visu/core/Color3.hpp"
+#include "visu/render/Renderer.hpp"
 
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
@@ -63,9 +66,7 @@ namespace
 
     // Matrice de rotation depuis les angles d'Euler (degres), via le meme
     // quaternion que le picking -> draw et pick s'accordent forcement.
-    Mat4 rotationMat(float rxDeg, float ryDeg, float rzDeg)
-    {
-        ee::math::Quaternion q = ee::math::Quaternion::fromEulerDeg(rxDeg, ryDeg, rzDeg);
+    Mat4 rotationMat(ee::math::Quaternion q) {
         float w = q.w, x = q.x, y = q.y, z = q.z;
         Mat4 r{};
         r.m[0] = 1 - 2 * (y * y + z * z);
@@ -145,7 +146,7 @@ namespace
     // Shader standard : PBR metal/rugosite (Cook-Torrance GGX), soleil +
     // lumieres ponctuelles + ambiante, puis tone mapping ACES et gamma.
     // uGlow > 0 : couleur plate (contours fil de fer, surbrillance).
-    const char *kVert = R"(#version 330 core
+    const char* kVert = R"(#version 330 core
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNormal;
 layout(location=2) in vec2 aUV;
@@ -558,8 +559,10 @@ namespace ee::render
         return true;
     }
 
-    bool GLRenderer::ensureInit()
-    {
+    bool GLRenderer::isBuiltIn(MeshHandle mesh) const {
+        return mesh == m_sphere || mesh == m_cube || mesh == m_cylinder || mesh == m_hemisphere;
+    }
+    bool GLRenderer::ensureInit() {
         if (m_init)
             return true;
         if (m_failed)
@@ -903,7 +906,7 @@ namespace ee::render
         if (!m_frameOk || v.w <= 0 || v.h <= 0)
             return;
 
-        // Matrices derivees de la camera-donnee (aspect = celui de la vue).
+        // Matrices derivees de la camera-donnee (aspect = celui de la vue)
         float eye[3] = {cam.pos.x, cam.pos.y, cam.pos.z};
         float fwd[3];
         forwardFrom(cam.yaw, cam.pitch, fwd);
@@ -944,8 +947,7 @@ namespace ee::render
     }
 
     // Couleur sRGB * intensite -> lineaire (ce qu'attend le shader).
-    static void linearColor(const Color &_c, float _intensity, float _out[3])
-    {
+    static void linearColor(const ee::Color3& _c, float _intensity, float _out[3]) {
         _out[0] = std::pow(_c.r, 2.2f) * _intensity;
         _out[1] = std::pow(_c.g, 2.2f) * _intensity;
         _out[2] = std::pow(_c.b, 2.2f) * _intensity;
@@ -961,10 +963,10 @@ namespace ee::render
         RenderSettings s = settings;
         auto clampi = [](int _v, int _lo, int _hi) { return std::max(_lo, std::min(_hi, _v)); };
         s.maxPointLights = clampi(s.maxPointLights, 1, 64);
-        s.sunShadowResolution = clampi(s.sunShadowResolution, 512, 8192);
-        s.sunShadowDistance = std::max(1.0f, std::min(1000.0f, s.sunShadowDistance));
-        s.maxShadowedPointLights = clampi(s.maxShadowedPointLights, 0, 16);
-        s.pointShadowResolution = clampi(s.pointShadowResolution, 128, 2048);
+        s.sun.resolution = clampi(s.sun.resolution, 512, 8192);
+        s.sun.distance = std::max(1.0f, std::min(1000.0f, s.sun.distance));
+        s.point.maxLight = clampi(s.point.maxLight, 0, 16);
+        s.point.resolution = clampi(s.point.resolution, 128, 2048);
         if (s == m_settings)
             return;
         // Le shader est recompile au prochain flushView si le nombre de lampes
@@ -990,7 +992,7 @@ namespace ee::render
         m_activePoints.clear();
         m_activeRows.clear();
         int shadowed = 0;
-        const int maxShadowed = m_settings.pointShadows ? m_settings.maxShadowedPointLights : 0;
+        const int maxShadowed = m_settings.point.enable ? m_settings.point.maxLight : 0;
         for (const auto &o : order)
         {
             if (static_cast<int>(m_activePoints.size()) >= m_settings.maxPointLights)
@@ -1007,11 +1009,12 @@ namespace ee::render
         linearColor(m_lights.ambient, m_lights.ambientIntensity, c);
         glUniform3fv(m_uAmbient, 1, c);
         glUniform1i(m_uSunOn, m_lights.sun ? 1 : 0);
-        float d[3] = {m_lights.sunDir.x, m_lights.sunDir.y, m_lights.sunDir.z};
-        glUniform3fv(m_uSunDir, 1, d);
-        linearColor(m_lights.sunColor, m_lights.sunIntensity, c);
-        glUniform3fv(m_uSunColor, 1, c);
-
+        if (m_lights.sun) {
+            float d[3] = {m_lights.sun->dir.x, m_lights.sun->dir.y, m_lights.sun->dir.z};
+            glUniform3fv(m_uSunDir, 1, d);
+            linearColor(m_lights.sun->color, m_lights.sun->intensity, c);
+            glUniform3fv(m_uSunColor, 1, c);
+        }
         glUniform1i(m_uSunShadowOn, sunShadow ? 1 : 0);
         if (sunShadow)
         {
@@ -1119,8 +1122,15 @@ namespace ee::render
             r2 = std::max(r2, verts[i] * verts[i] + verts[i + 1] * verts[i + 1] +
                                   verts[i + 2] * verts[i + 2]);
         e.radius = std::sqrt(r2);
-        m_meshes.push_back(e);
-        return (MeshHandle)m_meshes.size(); // handle = index + 1
+
+        if (m_freeMeshes.empty()) {
+            m_meshes.push_back(e);
+            return (MeshHandle)m_meshes.size(); // handle = index + 1
+        }
+        MeshHandle handle = m_freeMeshes.back();
+        m_freeMeshes.pop_back();
+        m_meshes[handle - 1] = e;
+        return handle;
     }
 
     void GLRenderer::attachWireIndices(MeshHandle mesh, const unsigned int *idx, int idxCount)
@@ -1155,6 +1165,22 @@ namespace ee::render
         return 0;
     }
 
+    void GLRenderer::destroyMesh(MeshHandle mesh) {
+        if (mesh == 0 || mesh > m_meshes.size() || isBuiltIn(mesh)) return;
+
+        Mesh& m = m_meshes[mesh - 1];
+
+        if (m.vao == 0) return;
+
+        glDeleteBuffers(1, &m.vbo);
+        glDeleteBuffers(1, &m.ebo);
+
+        if (m.wireEbo) glDeleteBuffers(1, &m.wireEbo);
+        glDeleteVertexArrays(1, &m.vao);
+        m = Mesh{};
+        m_freeMeshes.push_back(mesh);
+    }
+
     MeshHandle GLRenderer::createMesh(const float *verts, int vertFloatCount,
                                       const unsigned int *indices, int indexCount)
     {
@@ -1166,12 +1192,10 @@ namespace ee::render
     }
 
     // Matrice model = translate * rotation * scale, centre et rayon monde.
-    static void queuedTransform(Vec3 pos, Vec3 scale, Vec3 eulerDeg, float meshRadius,
-                                float outModel[16], float outPos[3], float &outRadius)
-    {
-        Mat4 rot = rotationMat(eulerDeg.x, eulerDeg.y, eulerDeg.z);
-        Mat4 model = mul(translate(pos.x, pos.y, pos.z),
-                         mul(rot, scale3(scale.x, scale.y, scale.z)));
+    static void queuedTransform(ee::math::Vector3<float> pos, ee::math::Vector3<float> scale, ee::math::Quaternion rot,
+                                float meshRadius, float outModel[16], float outPos[3], float& outRadius) {
+        Mat4 rotation = rotationMat(rot);
+        Mat4 model = mul(translate(pos.x, pos.y, pos.z), mul(rotation, scale3(scale.x, scale.y, scale.z)));
         for (int i = 0; i < 16; ++i)
             outModel[i] = model.m[i];
         outPos[0] = pos.x;
@@ -1181,29 +1205,27 @@ namespace ee::render
         outRadius = meshRadius * std::max(sx, std::max(sy, sz));
     }
 
-    void GLRenderer::drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg, const Material &mat)
-    {
-        if (!m_init || mesh == 0 || mesh > m_meshes.size())
-            return;
+    void GLRenderer::drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                              ee::math::Quaternion rot, const Material& mat) {
+        if (!m_init || mesh == 0 || mesh > m_meshes.size() || m_meshes[mesh - 1].vao == 0) return;
         Queued q;
         q.kind = mat.transparent ? DrawKind::Transparent : DrawKind::Opaque;
         q.mesh = mesh;
         q.mat = mat;
-        queuedTransform(pos, scale, eulerDeg, m_meshes[mesh - 1].radius, q.model, q.pos, q.radius);
+        queuedTransform(pos, scale, rot, m_meshes[mesh - 1].radius, q.model, q.pos, q.radius);
         float dx = pos.x - m_camPos[0], dy = pos.y - m_camPos[1], dz = pos.z - m_camPos[2];
         q.dist2 = dx * dx + dy * dy + dz * dz;
         m_queue.push_back(q);
     }
 
-    void GLRenderer::drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg, Color col)
-    {
-        if (!m_init || mesh == 0 || mesh > m_meshes.size())
-            return;
+    void GLRenderer::drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                                  ee::math::Quaternion rot, ee::Color3 col) {
+        if (!m_init || mesh == 0 || mesh > m_meshes.size() || m_meshes[mesh - 1].vao == 0) return;
         Queued q;
         q.kind = DrawKind::Wire;
         q.mesh = mesh;
         q.mat.albedo = col;
-        queuedTransform(pos, scale, eulerDeg, m_meshes[mesh - 1].radius, q.model, q.pos, q.radius);
+        queuedTransform(pos, scale, rot, m_meshes[mesh - 1].radius, q.model, q.pos, q.radius);
         m_queue.push_back(q);
     }
 
@@ -1212,9 +1234,8 @@ namespace ee::render
         int maxTex = 4096;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTex);
 
-        int sunRes = std::min(m_settings.sunShadowResolution, maxTex);
-        if (m_settings.sunShadows && sunRes != m_sunRes)
-        {
+        int sunRes = std::min(m_settings.sun.resolution, maxTex);
+        if (m_settings.sun.enable && sunRes != m_sunRes) {
             glBindTexture(GL_TEXTURE_2D, m_sunTex);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, sunRes, sunRes, 0,
                          GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -1223,13 +1244,11 @@ namespace ee::render
 
         // Atlas : 6 cases de large, une ligne par lampe ombree ; on reduit
         // les cases si l'atlas depasse la taille max d'une texture.
-        int rows = std::max(1, m_settings.maxShadowedPointLights);
-        int tile = m_settings.pointShadowResolution;
+        int rows = std::max(1, m_settings.point.maxLight);
+        int tile = m_settings.point.resolution;
         while (tile > 16 && (tile * 6 > maxTex || tile * rows > maxTex))
             tile /= 2;
-        if (m_settings.pointShadows && m_settings.maxShadowedPointLights > 0 &&
-            (tile != m_pointTile || rows != m_pointRows))
-        {
+        if (m_settings.point.enable && m_settings.point.maxLight > 0 && (tile != m_pointTile || rows != m_pointRows)) {
             glBindTexture(GL_TEXTURE_2D, m_pointTex);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, tile * 6, tile * rows, 0,
                          GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -1260,9 +1279,9 @@ namespace ee::render
     // grille des texels pour que l'ombre ne scintille pas quand on bouge.
     void GLRenderer::renderSunShadow(float outVP[16])
     {
-        const float D = m_settings.sunShadowDistance;
+        const float D = m_settings.sun.distance;
         const float h = D * 0.5f;
-        float dir[3] = {m_lights.sunDir.x, m_lights.sunDir.y, m_lights.sunDir.z};
+        float dir[3] = {m_lights.sun->dir.x, m_lights.sun->dir.y, m_lights.sun->dir.z};
         normalize3(dir);
         float up[3] = {0.0f, 1.0f, 0.0f};
         if (std::fabs(dir[1]) > 0.99f)
@@ -1355,8 +1374,7 @@ namespace ee::render
         bool anyOpaque = false;
         for (const Queued &q : m_queue)
             anyOpaque |= q.kind == DrawKind::Opaque;
-        const bool sunShadow = anyOpaque && m_lights.sun && m_lights.sunShadows &&
-                               m_settings.sunShadows;
+        const bool sunShadow = anyOpaque && m_lights.sun && m_lights.sun->castShadows && m_settings.sun.enable;
         bool pointShadow = false;
         for (int r : m_activeRows)
             pointShadow |= r >= 0;
@@ -1390,8 +1408,8 @@ namespace ee::render
         // --- Passe principale ---
         glUseProgram(m_program);
         glUniform3fv(m_uCamPos, 1, m_camPos);
-        applyLights(sunShadow, sunVP, 2.0f * m_settings.sunShadowDistance * 0.5f /
-                                          static_cast<float>(std::max(1, m_sunRes)));
+        applyLights(sunShadow, sunVP,
+                    2.0f * m_settings.sun.distance * 0.5f / static_cast<float>(std::max(1, m_sunRes)));
         glActiveTexture(GL_TEXTURE0 + kSunShadowUnit);
         glBindTexture(GL_TEXTURE_2D, m_sunTex);
         glActiveTexture(GL_TEXTURE0 + kPointShadowUnit);
@@ -1473,8 +1491,7 @@ namespace ee::render
         glDrawElements(GL_TRIANGLES, m.indexCount, GL_UNSIGNED_INT, nullptr);
     }
 
-    void GLRenderer::drawWireNow(MeshHandle mesh, const float modelM[16], Color col)
-    {
+    void GLRenderer::drawWireNow(MeshHandle mesh, const float modelM[16], ee::Color3 col) {
         const Mesh &m = m_meshes[mesh - 1];
         Mat4 vp, model;
         for (int i = 0; i < 16; ++i)

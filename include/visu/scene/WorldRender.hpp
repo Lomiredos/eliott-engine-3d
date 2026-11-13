@@ -11,6 +11,7 @@
 
 #include "ecs/World.hpp"
 
+#include "math/Vector3.hpp"
 #include "visu/render/Renderer.hpp"
 #include "visu/core/MeshStore.hpp"
 
@@ -47,10 +48,10 @@ namespace ee::scene
             {
                 const DirectionalLightComponent &l = *_w.getComponent<DirectionalLightComponent>(e);
                 ee::math::Vector3<float> f = worldXform(_w, e).rot.forward();
-                lights.sunDir = {f.x, f.y, f.z};
-                lights.sunColor = {l.color.r, l.color.g, l.color.b};
-                lights.sunIntensity = l.intensity;
-                lights.sunShadows = l.shadows;
+                lights.sun->dir = {f.x, f.y, f.z};
+                lights.sun->color = {l.color.r, l.color.g, l.color.b};
+                lights.sun->intensity = l.intensity;
+                lights.sun->castShadows = l.shadows;
                 sunSet = anyLight = true;
             }
             if (_w.hasComponent<PointLightComponent>(e))
@@ -71,8 +72,7 @@ namespace ee::scene
                 lights.ambientIntensity = l.intensity;
             }
         }
-        if (anyLight && !sunSet)
-            lights.sun = false;
+        if (anyLight && !sunSet) lights.sun.reset();
         return lights;
     }
 
@@ -90,9 +90,7 @@ namespace ee::scene
             if (!_w.hasComponent<TransformComponent>(e))
                 continue;
 
-            const Xform wx = worldXform(_w, e); // monde (parent resolu)
-            ee::render::Vec3 pos{wx.pos.x, wx.pos.y, wx.pos.z};
-            ee::render::Vec3 euler{wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z};
+            const Xform wx = worldXform(_w, e);
             const float scx = wx.scale.x, scy = wx.scale.y, scz = wx.scale.z;
 
             // Materiau (.mat) de l'entite, sinon couleur unie de la forme.
@@ -100,8 +98,7 @@ namespace ee::scene
                 _w.hasComponent<MaterialComponent>(e)
                     ? ee::core::getMaterial(_w.getComponent<MaterialComponent>(e)->path)
                     : nullptr;
-            auto matFor = [&](ee::render::Color _fallback)
-            {
+            auto matFor = [&](ee::Color3 _fallback) {
                 return asset ? ee::systems::renderMaterial(_r, *asset)
                              : ee::systems::colorMaterial(_fallback);
             };
@@ -109,17 +106,15 @@ namespace ee::scene
             if (_w.hasComponent<SphereComponent>(e))
             {
                 float radius = _w.getComponent<SphereComponent>(e)->radius;
-                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), pos,
-                            {radius * scx, radius * scy, radius * scz}, euler,
-                            matFor({0.85f, 0.20f, 0.20f}));
+                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), wx.pos, {radius * scx, radius * scy, radius * scz},
+                            wx.rot, matFor({0.85f, 0.20f, 0.20f}));
             }
 
             if (_w.hasComponent<RectComponent>(e))
             {
                 RectComponent &rc = *_w.getComponent<RectComponent>(e);
-                _r.drawMesh(_r.builtin(ee::render::Prim::Cube), pos,
-                            {rc.size.x * scx, rc.size.y * scy, rc.size.z * scz}, euler,
-                            matFor({0.85f, 0.20f, 0.20f}));
+                _r.drawMesh(_r.builtin(ee::render::Prim::Cube), wx.pos,
+                            {rc.size.x * scx, rc.size.y * scy, rc.size.z * scz}, wx.rot, matFor({0.85f, 0.20f, 0.20f}));
             }
 
             if (_w.hasComponent<CapsuleComponent>(e))
@@ -129,16 +124,15 @@ namespace ee::scene
                 float hh = cc.height * scy;
                 ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
 
-                _r.drawMesh(_r.builtin(ee::render::Prim::Cylinder), pos,
-                            ee::render::Vec3{rr, hh, rr}, euler, capCol);
+                _r.drawMesh(_r.builtin(ee::render::Prim::Cylinder), wx.pos, ee::math::Vector3<float>{rr, hh, rr},
+                            wx.rot, capCol);
 
-                ee::math::Quaternion q = ee::math::Quaternion::fromEulerDeg(euler.x, euler.y, euler.z);
-                ee::math::Vector3<float> off = q.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-                ee::render::Vec3 top{pos.x + off.x, pos.y + off.y, pos.z + off.z};
-                ee::render::Vec3 bot{pos.x - off.x, pos.y - off.y, pos.z - off.z};
-                ee::render::Vec3 sphR{rr, rr, rr};
-                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), top, sphR, euler, capCol);
-                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), bot, sphR, euler, capCol);
+                ee::math::Vector3<float> off = wx.rot.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
+                ee::math::Vector3<float> top{wx.pos.x + off.x, wx.pos.y + off.y, wx.pos.z + off.z};
+                ee::math::Vector3<float> bot{wx.pos.x - off.x, wx.pos.y - off.y, wx.pos.z - off.z};
+                ee::math::Vector3<float> sphR{rr, rr, rr};
+                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), top, sphR, wx.rot, capCol);
+                _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), bot, sphR, wx.rot, capCol);
             }
 
             if (_w.hasComponent<MeshComponent>(e))
@@ -149,8 +143,7 @@ namespace ee::scene
                     if (cm.gpu == 0)
                         cm.gpu = _r.createMesh(cm.verts.data(), (int)cm.verts.size(),
                                                cm.idx.data(), (int)cm.idx.size());
-                    _r.drawMesh(cm.gpu, pos, ee::render::Vec3{scx, scy, scz}, euler,
-                                matFor({0.80f, 0.80f, 0.85f}));
+                    _r.drawMesh(cm.gpu, wx.pos, wx.scale, wx.rot, matFor({0.80f, 0.80f, 0.85f}));
                 }
             }
 
@@ -162,11 +155,11 @@ namespace ee::scene
                 if (shape >= 0 && shape < EnumNames<ColliderShape>::count)
                     col.shape = EnumNames<ColliderShape>::values[shape];
                 col.offset = {cc.offset.x, cc.offset.y, cc.offset.z};
-                col.euler = {cc.euler.x, cc.euler.y, cc.euler.z};
+                col.quat = ee::math::Quaternion::fromEulerDeg(cc.euler);
                 col.radius = cc.radius;
                 col.halfExtents = {cc.halfExtents.x, cc.halfExtents.y, cc.halfExtents.z};
                 col.height = cc.height;
-                ee::systems::drawColliderWire(_r, pos, euler, {scx, scy, scz}, col);
+                ee::systems::drawColliderWire(_r, wx.pos, wx.rot, {scx, scy, scz}, col);
             }
         }
     }
@@ -183,9 +176,8 @@ namespace ee::scene
                 continue;
             const CameraComponent &c = *_w.getComponent<CameraComponent>(e);
             const Xform wx = worldXform(_w, e);
-            ee::render::Camera cam = ee::systems::cameraFromTransform(
-                {wx.pos.x, wx.pos.y, wx.pos.z}, {wx.eulerDeg.x, wx.eulerDeg.y, wx.eulerDeg.z},
-                c.fov, c.nearZ, c.farZ);
+            ee::render::Camera cam =
+                ee::systems::cameraFromTransform({wx.pos.x, wx.pos.y, wx.pos.z}, wx.rot, c.fov, c.nearZ, c.farZ);
             if (c.isMain)
                 active.push_back(cam);
             else if (first.empty())

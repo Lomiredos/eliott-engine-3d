@@ -28,6 +28,43 @@ namespace ee::math
             Quaternion qz = fromAxisAngle({0, 0, 1}, rzDeg * k);
             return qz * qy * qx;
         }
+        static Quaternion fromEulerDeg(Vector3<float> _rDeg) {
+            const float k = 3.14159265358979323846f / 180.0f;
+            Quaternion qx = fromAxisAngle({1, 0, 0}, _rDeg.x * k);
+            Quaternion qy = fromAxisAngle({0, 1, 0}, _rDeg.y * k);
+            Quaternion qz = fromAxisAngle({0, 0, 1}, _rDeg.z * k);
+            return qz * qy * qx;
+        }
+
+        Vector3<float> toEulerDeg() const {
+
+            const double r00 = 1.0 - 2.0 * (y * y + z * z);
+            const double r01 = 2.0 * (x * y - w * z);
+            const double r02 = 2.0 * (x * z + w * y);
+            const double r10 = 2.0 * (x * y + w * z);
+            const double r20 = 2.0 * (x * z - w * y);
+            const double r21 = 2.0 * (y * z + w * x);
+            const double r22 = 1.0 - 2.0 * (x * x + y * y);
+
+            double ax, ay, az;
+            if (r20 <= -0.999999) // Y = +90
+            {
+                ay = 3.14159265358979323846 / 2.0;
+                az = 0.0;
+                ax = std::atan2(r01, r02);
+            } else if (r20 >= 0.999999) // Y = -90
+            {
+                ay = -3.14159265358979323846 / 2.0;
+                az = 0.0;
+                ax = std::atan2(-r01, -r02);
+            } else {
+                ay = std::asin(-r20);
+                ax = std::atan2(r21, r22);
+                az = std::atan2(r10, r00);
+            }
+            const double toDeg = 180.0 / 3.14159265358979323846;
+            return {static_cast<float>(ax * toDeg), static_cast<float>(ay * toDeg), static_cast<float>(az * toDeg)};
+        }
 
         Quaternion operator*(const Quaternion &q) const
         {

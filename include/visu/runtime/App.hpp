@@ -12,6 +12,10 @@
 
 #include "visu/core/Window.hpp"
 #include "visu/runtime/GameSession.hpp"
+#include "visu/fsm/API.hpp"
+#include "visu/fsm/EntityAPI.hpp"
+#include "visu/fsm/StateMachine.hpp"
+#include "visu/fsm/Utils.hpp"
 #include "visu/runtime/GlfwKeys.hpp"
 #include "visu/render/GLRenderer.hpp"
 
@@ -36,17 +40,9 @@
 
 namespace ee::runtime
 {
-    namespace detail
-    {
-        // Pas de temps max d'un tick (1/20 s). Une frame longue (chargement de
-        // textures, fenetre deplacee, breakpoint...) donnerait sinon un dt
-        // enorme : la physique ferait un grand saut et traverserait le sol.
-        // Au-dela, le jeu ralentit au lieu de sauter.
+    namespace detail {
         inline constexpr float kMaxDt = 0.05f;
 
-        // Nourrit InputManager depuis un etat "enfonce ou pas" par touche et
-        // par bouton : appui/maintien/relache sont deduits de la frame d'avant.
-        // Meme chemin que l'etat vienne de GLFW (fenetre du jeu) ou de l'editeur.
         inline void applyKeysAndMouse(const std::vector<bool> &_keys, const bool _mouse[5],
                                       float _mx, float _my)
         {
@@ -73,8 +69,6 @@ namespace ee::runtime
             im.SyncMousePosition(_mx, _my);
         }
 
-        // Manette (1ere connectee) : API gamepad de GLFW, independante de SDL.
-        // Lue par le jeu lui-meme dans les deux modes.
         inline void pollGamepad()
         {
             using ee::input::InputManager;
@@ -113,9 +107,6 @@ namespace ee::runtime
                 im.SyncGamepadAxis(static_cast<ee::input::GamepadAxis>(i), pad.axes[s_padAxisMap[i]]);
         }
 
-        // Lit GLFW chaque frame et nourrit InputManager via les Sync* (pas de
-        // fenetre SDL3 ici -> pas d'update()/event-pump SDL possible).
-        // Touches lues par POSITION physique (GLFW_KEY_* = disposition US).
         inline void pollInput(GLFWwindow *_win)
         {
             int keyCount = 0;
@@ -151,11 +142,6 @@ namespace ee::runtime
             pollGamepad();
         }
 
-        // ---------------------------------------------------------------
-        // Lien avec l'editeur (EE_EDITOR_HOST defini) : recoit les ordres
-        // (stop, taille, input, champs modifies) et renvoie regulierement
-        // l'etat du World (snapshot) pour l'inspecteur.
-        // ---------------------------------------------------------------
         class EditorLink
         {
         public:
@@ -191,13 +177,16 @@ namespace ee::runtime
                         m_selected = m.value("e", -1);
                     else if (t == "set")
                         applySet(_game, m);
+                    else if (t == "fsmset")
+                        applyFsmSet(_game, m);
                 }
 
                 if (_now - m_lastSnapshot >= 0.05) // ~20 Hz suffit a l'inspecteur
                 {
                     m_lastSnapshot = _now;
-                    m_sock.send(ee::ipc::msgSnapshot(ee::scene::snapshotWorld(
-                        _game.world(), _game.entities(), _game.scene(), _game.registry())));
+                    m_sock.send(ee::ipc::msgSnapshot(
+                        ee::scene::snapshotWorld(_game.world(), _game.entities(), _game.scene(), _game.registry()),
+                        fsmStates(_game)));
                 }
                 return alive;
             }
@@ -209,6 +198,56 @@ namespace ee::runtime
             int height() const { return m_height; }
 
         private:
+            static std::vector<ee::ipc::FsmLiveState> fsmStates(GameSession& _game) {
+                std::vector<ee::ipc::FsmLiveState> out;
+                ee::ecs::World& world = _game.world();
+                const std::vector<ee::ecs::EntityID>& ents = _game.entities();
+                for (size_t i = 0; i < ents.size(); ++i) {
+                    if (!world.hasComponent<StateMachineComponent>(ents[i])) continue;
+                    ee::ipc::FsmLiveState live;
+                    live.entity = static_cast<int>(i);
+                    live.state = ee::fsm::currentStateName(world, ents[i]);
+                    const StateMachineComponent& comp = *world.getComponent<StateMachineComponent>(ents[i]);
+                    live.path = comp.path;
+                    if (comp.def && comp.inst.params.size() == comp.def->params.size())
+                        for (size_t p = 0; p < comp.def->params.size(); ++p)
+                            std::visit([&](auto v) { live.params[comp.def->params[p].name] = v; }, comp.inst.params[p]);
+                    out.push_back(std::move(live));
+                }
+                return out;
+            }
+
+            static void applyFsmSet(GameSession& _game, const nlohmann::json& _m) {
+                const int e = _m.value("e", -1);
+                const std::string name = _m.value("p", std::string());
+                if (e < 0 || e >= static_cast<int>(_game.entities().size()) || !_m.contains("v")) return;
+                ee::ecs::World& world = _game.world();
+                const ee::ecs::EntityID id = _game.entities()[e];
+                if (!world.hasComponent<StateMachineComponent>(id)) return;
+                StateMachineComponent& comp = *world.getComponent<StateMachineComponent>(id);
+                if (!ee::fsm::syncStateMachine(comp)) return;
+                const int index = ee::fsm::findParam(*comp.def, name);
+                if (index < 0) return;
+                const nlohmann::json& v = _m["v"];
+                switch (comp.def->params[index].type) {
+                    case ee::fsm::ParamType::Bool:
+                        if (v.is_boolean()) ee::fsm::setBool(*comp.def, comp.inst, index, v.get<bool>());
+                        break;
+                    case ee::fsm::ParamType::Trigger:
+                        if (v.is_boolean() && v.get<bool>())
+                            ee::fsm::setTrigger(*comp.def, comp.inst, index);
+                        else
+                            ee::fsm::resetTrigger(*comp.def, comp.inst, index);
+                        break;
+                    case ee::fsm::ParamType::Int:
+                        if (v.is_number()) ee::fsm::setInt(*comp.def, comp.inst, index, v.get<int>());
+                        break;
+                    case ee::fsm::ParamType::Float:
+                        if (v.is_number()) ee::fsm::setFloat(*comp.def, comp.inst, index, v.get<float>());
+                        break;
+                }
+            }
+
             void applySet(GameSession &_game, const nlohmann::json &_m)
             {
                 int e = _m.value("e", -1);
@@ -320,7 +359,7 @@ namespace ee::runtime
             glfwTerminate();
             return 0;
         }
-    }
+    } // namespace detail
 
     inline int run(const Config &_cfg,
                    const RegisterComponentsFn &_registerComponents,

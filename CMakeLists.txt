@@ -106,9 +106,7 @@ target_link_libraries(ee-render PUBLIC
     OpenGL::GL
 )
 
-if(NOT EE_BUILD_RUNTIME)
-    return()
-endif()
+add_subdirectory(extern/eliott-ecs)
 
 add_library(ee-fsm STATIC
     src/reflect/JsonReadVisitor.cpp
@@ -125,6 +123,11 @@ target_link_libraries(ee-fsm PUBLIC
     ee-reflect
     eliott-ecs
 )
+target_compile_features(ee-fsm PUBLIC cxx_std_20)
+
+if(NOT EE_BUILD_RUNTIME)
+    return()
+endif()
 
 add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
@@ -151,7 +154,6 @@ file(CONFIGURE
     @ONLY)
 target_include_directories(ee-core PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
-add_subdirectory(extern/eliott-ecs)
 # SDL ne sert qu'aux manettes (la fenetre et le clavier passent par GLFW) :
 # sans son module video, SDL statique n'embarque pas son propre code Wayland,
 # qui entre en conflit au link avec celui de GLFW.

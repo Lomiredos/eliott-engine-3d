@@ -303,3 +303,15 @@ TEST_CASE("changement de definition : l'instance repart de entryState"){
     CHECK(r.inst.currentState == 0);
     CHECK(r.inst.params.empty());
 }
+
+TEST_CASE("SetParam sur un trigger : true l'arme, false le vide"){
+    auto def = mustLoad(makeFsm(R"([{"name":"go","type":"trigger"},{"name":"fire","type":"trigger"}])", R"([
+        {"name":"A","actions":[{"type":"SetParam","param":"go","value":{"type":"bool","value":false}},
+                               {"type":"SetParam","param":"fire","value":{"type":"bool","value":true}}]}])",
+        "A", "[]"));
+    Runner r(def);
+    ee::fsm::setTrigger(def, r.inst, "go");
+    r.tick();
+    CHECK(ee::fsm::getTrigger(def, r.inst, "go") == false);
+    CHECK(ee::fsm::getTrigger(def, r.inst, "fire") == true);
+}

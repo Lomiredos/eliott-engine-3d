@@ -1,5 +1,7 @@
 #pragma once
 
+#include "math/Quaternion.hpp"
+#include "visu/core/Color3.hpp"
 #include "visu/render/Renderer.hpp"
 
 #include <filesystem>
@@ -19,16 +21,17 @@ public:
   void beginFrame(int width, int height) override;
   void beginView(const Camera &cam, const Viewport &view) override;
   MeshHandle builtin(Prim which) override;
+  void destroyMesh(MeshHandle mesh) override;
   MeshHandle createMesh(const float *verts, int vertFloatCount,
                         const unsigned int *indices, int indexCount) override;
   using IRenderer::drawMesh; // garde le raccourci drawMesh(..., Color)
-  void drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
-                const Material &mat) override;
+  void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale, ee::math::Quaternion rot,
+                const Material& mat) override;
   void setLights(const Lights &lights) override;
   void setSettings(const RenderSettings &settings) override;
   TextureHandle loadTexture(const std::string &path, bool srgb) override;
-  void drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
-                    Color col) override;
+  void drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                    ee::math::Quaternion rot, ee::Color3 col) override;
 
   void setOffscreen(bool offscreen) { m_offscreen = offscreen; }
 
@@ -42,38 +45,36 @@ public:
   void projMatrix(float out[16]) const;
 
 private:
-  bool ensureInit();
-  void ensureFbo(int w, int h);
-  // (Re)compile le shader principal pour m_settings.maxPointLights lampes.
-  bool buildProgram();
+    bool isBuiltIn(MeshHandle mesh) const;
+    bool ensureInit();
+    void ensureFbo(int w, int h);
+    // (Re)compile le shader principal pour m_settings.maxPointLights lampes.
+    bool buildProgram();
 
-  MeshHandle uploadMesh(const float *verts, int vertFloatCount,
-                        const unsigned int *idx, int idxCount);
+    MeshHandle uploadMesh(const float* verts, int vertFloatCount, const unsigned int* idx, int idxCount);
 
-  // Attache a un mesh (triangles) deja uploade un 2e jeu d'indices GL_LINES,
-  // fait des seules aretes "reelles" de la grille (sans les diagonales de
-  // triangulation) : c'est ce que drawWireMesh dessine pour les builtins.
-  void attachWireIndices(MeshHandle mesh, const unsigned int *idx,
-                         int idxCount);
+    // Attache a un mesh (triangles) deja uploade un 2e jeu d'indices GL_LINES,
+    // fait des seules aretes "reelles" de la grille (sans les diagonales de
+    // triangulation) : c'est ce que drawWireMesh dessine pour les builtins.
+    void attachWireIndices(MeshHandle mesh, const unsigned int* idx, int idxCount);
 
-  // Dessin immediat. faceSide : 0 = toutes les faces, 1 = arriere seules,
-  // -1 = avant seules (transparents).
-  void drawMeshNow(MeshHandle mesh, const float model[16], const Material &mat,
-                   int faceSide);
-  void drawWireNow(MeshHandle mesh, const float model[16], Color col);
+    // Dessin immediat. faceSide : 0 = toutes les faces, 1 = arriere seules,
+    // -1 = avant seules (transparents).
+    void drawMeshNow(MeshHandle mesh, const float model[16], const Material& mat, int faceSide);
+    void drawWireNow(MeshHandle mesh, const float model[16], ee::Color3 col);
 
-  // Draw de la vue en cours, executes par flushView (beginView suivant,
-  // endScene) : il faut tous les objets avant l'eclairage pour les ombres.
-  enum class DrawKind { Opaque, Wire, Transparent };
-  struct Queued {
-    DrawKind kind = DrawKind::Opaque;
-    MeshHandle mesh = 0;
-    float model[16];
-    Material mat;          // Wire : couleur dans mat.albedo
-    float pos[3] = {};     // centre monde
-    float radius = 0.0f;   // rayon englobant monde (tri des ombres de lampe)
-    float dist2 = 0.0f;    // distance^2 a la camera (tri des transparents)
-  };
+    // Draw de la vue en cours, executes par flushView (beginView suivant,
+    // endScene) : il faut tous les objets avant l'eclairage pour les ombres.
+    enum class DrawKind { Opaque, Wire, Transparent };
+    struct Queued {
+        DrawKind kind = DrawKind::Opaque;
+        MeshHandle mesh = 0;
+        float model[16];
+        Material mat;        // Wire : couleur dans mat.albedo
+        float pos[3] = {};   // centre monde
+        float radius = 0.0f; // rayon englobant monde (tri des ombres de lampe)
+        float dist2 = 0.0f;  // distance^2 a la camera (tri des transparents)
+    };
   std::vector<Queued> m_queue;
   void flushView();
 
@@ -104,6 +105,7 @@ private:
   };
   std::vector<Mesh> m_meshes;
   MeshHandle m_sphere = 0, m_cube = 0, m_cylinder = 0, m_hemisphere = 0;
+  std::vector<MeshHandle> m_freeMeshes;
 
   int m_uMVP = -1, m_uModel = -1, m_uColor = -1, m_uGlow = -1;
   // Materiau + eclairage (shader PBR).

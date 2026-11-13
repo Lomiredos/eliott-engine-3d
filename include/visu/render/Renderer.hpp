@@ -1,172 +1,147 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
+#include "math/Vector3.hpp"
+#include "math/Quaternion.hpp"
+#include "visu/core/Color3.hpp"
 
 namespace ee::render {
-struct Vec3 {
-  float x = 0.0f, y = 0.0f, z = 0.0f;
-};
 
-struct Color {
-  float r = 1.0f, g = 1.0f, b = 1.0f;
-};
+    struct Camera {
+        ee::math::Vector3<float> pos;
+        float yaw = 0.0f;
+        float pitch = 0.0f;
+        float fovDeg = 45.0f;
+        float nearZ = 0.1f;
+        float farZ = 200.0f;
+    };
 
-struct Camera {
-  Vec3 pos;
-  float yaw = 0.0f;
-  float pitch = 0.0f;
-  float fovDeg = 45.0f;
-  float nearZ = 0.1f;
-  float farZ = 200.0f;
-};
+    struct Viewport {
+        int x = 0, y = 0, w = 0, h = 0;
+    };
 
-// Zone de l'image, en pixels, origine en haut a gauche.
-struct Viewport {
-  int x = 0, y = 0, w = 0, h = 0;
-};
+    using MeshHandle = unsigned int;
+    using TextureHandle = unsigned int;
 
-using MeshHandle = unsigned int;
-using TextureHandle = unsigned int; // 0 = aucune texture
+    enum class MapSlot {
+        Albedo,    // couleur de base (sRGB)
+        Normal,    // normal map (espace tangent)
+        Metallic,  // canal R
+        Roughness, // canal R
+        AO,        // occlusion ambiante, canal R
+        Emissive,  // lumiere propre (sRGB)
+        Count
+    };
 
-// Les maps d'un materiau PBR (metal/rugosite), dans l'ordre des unites de
-// texture du shader.
-enum class MapSlot : int {
-  Albedo,    // couleur de base (sRGB)
-  Normal,    // normal map (espace tangent)
-  Metallic,  // canal R
-  Roughness, // canal R
-  AO,        // occlusion ambiante, canal R
-  Emissive,  // lumiere propre (sRGB)
-  Count
-};
+    struct Material {
+        ee::Color3 albedo;
+        float metallic = 0.0f;
+        float roughness = 0.6f;
+        float ao = 1.0f;
+        ee::Color3 emissive{0.0f, 0.0f, 0.0f};
+        float emissiveIntensity = 1.0f;
+        float normalStrength = 1.0f;
+        float tiling[2] = {1.0f, 1.0f};
+        float offset[2] = {0.0f, 0.0f};
+        TextureHandle maps[static_cast<int>(MapSlot::Count)] = {};
+        bool transparent = false;
+        float opacity = 1.0f;
+    };
 
-// Materiau tel que le renderer le dessine (les textures deja chargees).
-// Couleurs en sRGB (comme un selecteur de couleur), converties par le shader.
-struct Material {
-  Color albedo{1.0f, 1.0f, 1.0f};
-  float metallic = 0.0f;
-  float roughness = 0.6f;
-  float ao = 1.0f;
-  Color emissive{0.0f, 0.0f, 0.0f};
-  float emissiveIntensity = 1.0f;
-  float normalStrength = 1.0f;
-  float tiling[2] = {1.0f, 1.0f}; // repetition des uv
-  float offset[2] = {0.0f, 0.0f};
-  TextureHandle maps[static_cast<int>(MapSlot::Count)] = {};
-  // Transparent (verre, eau...) : dessine apres les opaques, du plus loin au
-  // plus proche. opacity = part du diffus gardee (x alpha de la map albedo) ;
-  // les reflets ne sont pas attenues.
-  bool transparent = false;
-  float opacity = 1.0f;
-};
+    struct PointLight {
+        ee::math::Vector3<float> pos;
+        ee::Color3 color;
+        float intensity = 5.0f;
+        float range = 10.0f;
+        bool shadows = true;
+    };
 
-struct PointLight {
-  Vec3 pos;
-  Color color;
-  float intensity = 5.0f;
-  float range = 10.0f; // au-dela, plus aucune lumiere
-  bool shadows = true;  // projette des ombres (voir RenderSettings)
-};
+    struct DirectionalLight {
+        ee::math::Vector3<float> dir{-0.5f, -1.0f, -0.3f};
+        ee::Color3 color;
+        float intensity = 2.5f;
+        bool castShadows = true;
+    };
 
-// Eclairage d'une image (setLights). Par defaut : un soleil et une ambiance
-// douce, pour qu'une scene sans lumiere reste lisible.
-struct Lights {
-  Color ambient{1.0f, 1.0f, 1.0f};
-  float ambientIntensity = 0.25f;
-  bool sun = true;
-  Vec3 sunDir{-0.5f, -1.0f, -0.3f}; // direction dans laquelle va la lumiere
-  Color sunColor{1.0f, 1.0f, 1.0f};
-  float sunIntensity = 2.5f;
-  bool sunShadows = true;
-  // Toutes celles de la scene : le renderer garde les maxPointLights les
-  // plus proches de la camera (RenderSettings).
-  std::vector<PointLight> points;
-};
+    struct Lights {
+        ee::Color3 ambient;
+        float ambientIntensity = 0.25f;
+        std::optional<DirectionalLight> sun = DirectionalLight{};
+        std::vector<PointLight> points;
+    };
 
-// Reglages du rendu (Assets/EngineSettings.json du projet, onglet Reglages
-// de l'editeur). Valeurs hors bornes ramenees dans les bornes par setSettings.
-struct RenderSettings {
-  // Lampes ponctuelles prises en compte par image (les plus proches de la
-  // camera). Chacune coute un calcul par pixel. 1..64.
-  int maxPointLights = 8;
+    struct RenderSettings {
 
-  // Ombres du soleil : une shadow map couvrant sunShadowDistance devant la
-  // camera. Plus la distance est grande, plus les ombres sont floues.
-  bool sunShadows = true;
-  int sunShadowResolution = 2048; // 512..8192
-  float sunShadowDistance = 40.0f;
+        int maxPointLights = 8;
 
-  // Ombres des lampes : 6 rendus de la scene par lampe ombree (cher).
-  // Les maxShadowedPointLights lampes les plus proches en ont. 0..16.
-  bool pointShadows = true;
-  int maxShadowedPointLights = 4;
-  int pointShadowResolution = 512; // par face, 128..2048
+        struct sunShadows {
+            bool enable = true;
+            int resolution = 2048;
+            float distance = 40.f;
+            bool operator==(const sunShadows& s) const = default;
+        } sun;
+        struct pointShadows {
+            bool enable = true;
+            int maxLight = 4;
+            int resolution = 512;
+            bool operator==(const pointShadows& s) const = default;
+        } point;
 
-  // (pas de "= default" : l'editeur compile en C++17)
-  bool operator==(const RenderSettings &o) const {
-    return maxPointLights == o.maxPointLights && sunShadows == o.sunShadows &&
-           sunShadowResolution == o.sunShadowResolution &&
-           sunShadowDistance == o.sunShadowDistance &&
-           pointShadows == o.pointShadows &&
-           maxShadowedPointLights == o.maxShadowedPointLights &&
-           pointShadowResolution == o.pointShadowResolution;
-  }
-  bool operator!=(const RenderSettings &o) const { return !(*this == o); }
-};
+        bool operator==(const RenderSettings& o) const = default;
+        bool operator!=(const RenderSettings& o) const { return !(*this == o); }
+    };
 
-// Hemisphere = demi-sphere unitaire bombee vers +Y (dome), pour les bouts
-// d'une capsule : evite d'afficher une sphere complete qui chevaucherait
-// le cylindre.
-enum class Prim { Sphere, Cube, Cylinder, Hemisphere };
+    enum class Prim { Sphere, Cube, Cylinder, Hemisphere };
 
-class IRenderer {
-public:
-  virtual ~IRenderer() = default;
+    class IRenderer {
+    public:
+        virtual ~IRenderer() = default;
 
-  // Une seule camera sur toute l'image (= beginFrame + beginView plein ecran).
-  virtual void beginScene(const Camera &cam, int width, int height) = 0;
-  virtual void endScene() = 0;
+        // Une seule camera sur toute l'image (= beginFrame + beginView plein ecran).
+        virtual void beginScene(const Camera& cam, int width, int height) = 0;
+        virtual void endScene() = 0;
 
-  // Plusieurs vues dans une image (ecran partage) : beginFrame remplit tout
-  // en noir, puis chaque beginView efface sa zone et y place sa camera ;
-  // les draw suivants vont dans cette zone. endScene une fois a la fin.
-  virtual void beginFrame(int width, int height) = 0;
-  virtual void beginView(const Camera &cam, const Viewport &view) = 0;
-  // Les draw d'une vue sont executes a sa fin (beginView suivant ou
-  // endScene) : ombres d'abord, puis opaques, fil de fer, transparents.
+        // Plusieurs vues dans une image (ecran partage) : beginFrame remplit tout
+        // en noir, puis chaque beginView efface sa zone et y place sa camera ;
+        // les draw suivants vont dans cette zone. endScene une fois a la fin.
+        virtual void beginFrame(int width, int height) = 0;
+        virtual void beginView(const Camera& cam, const Viewport& view) = 0;
+        // Les draw d'une vue sont executes a sa fin (beginView suivant ou
+        // endScene) : ombres d'abord, puis opaques, fil de fer, transparents.
 
-  // Eclairage des draw suivants (jusqu'au prochain setLights).
-  virtual void setLights(const Lights &lights) = 0;
+        // Eclairage des draw suivants (jusqu'au prochain setLights).
+        virtual void setLights(const Lights& lights) = 0;
 
-  // Reglages (nombre de lampes, ombres). Sans effet s'ils n'ont pas change.
-  virtual void setSettings(const RenderSettings &settings) = 0;
+        // Reglages (nombre de lampes, ombres). Sans effet s'ils n'ont pas change.
+        virtual void setSettings(const RenderSettings& settings) = 0;
 
-  // Texture depuis un fichier image (png, jpg, tga, bmp...), mise en cache
-  // et rechargee si le fichier change. srgb = couleur (albedo, emissive),
-  // sinon donnees (normal, metallic...). 0 si illisible.
-  virtual TextureHandle loadTexture(const std::string &path, bool srgb) = 0;
+        // Texture depuis un fichier image (png, jpg, tga, bmp...), mise en cache
+        // et rechargee si le fichier change. srgb = couleur (albedo, emissive),
+        // sinon donnees (normal, metallic...). 0 si illisible.
+        virtual TextureHandle loadTexture(const std::string& path, bool srgb) = 0;
 
-  virtual MeshHandle builtin(Prim which) = 0;
+        virtual MeshHandle builtin(Prim which) = 0;
 
-  virtual MeshHandle createMesh(const float *verts, int vertFloatCount,
-                                const unsigned int *indices,
-                                int indexCount) = 0;
+        virtual MeshHandle createMesh(const float* verts, int vertFloatCount, const unsigned int* indices,
+                                      int indexCount) = 0;
 
-  virtual void drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
-                        const Material &mat) = 0;
+        virtual void destroyMesh(MeshHandle mesh) = 0;
+        virtual void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                              ee::math::Quaternion rot, const Material& mat) = 0;
 
-  // Raccourci : materiau uni de cette couleur.
-  void drawMesh(MeshHandle mesh, Vec3 pos, Vec3 scale, Vec3 eulerDeg,
-                Color col) {
-    Material m;
-    m.albedo = col;
-    drawMesh(mesh, pos, scale, eulerDeg, m);
-  }
+        // Raccourci : materiau uni de cette couleur.
+        void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                      ee::math::Quaternion rot, ee::Color3 col) {
+            Material m;
+            m.albedo = col;
+            drawMesh(mesh, pos, scale, rot, m);
+        }
 
-  // Meme mesh, dessine en fil de fer (aretes) : pour les contours de debug
-  // (ex. forme d'un collider), jamais pour le rendu plein des composants.
-  virtual void drawWireMesh(MeshHandle mesh, Vec3 pos, Vec3 scale,
-                            Vec3 eulerDeg, Color col) = 0;
-};
+        // Meme mesh, dessine en fil de fer (aretes) : pour les contours de debug
+        // (ex. forme d'un collider), jamais pour le rendu plein des composants.
+        virtual void drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
+                                  ee::math::Quaternion rot, ee::Color3 col) = 0;
+    };
 } // namespace ee::render
