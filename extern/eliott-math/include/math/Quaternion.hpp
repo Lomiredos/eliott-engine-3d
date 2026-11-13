@@ -78,9 +78,15 @@ namespace ee::math
         Quaternion Normalize() const
         {
             float len = sqrtf(w * w + x * x + y * y + z * z);
-            if (len > 0.f)
-                return {w / len, x / len, y / len, z / len};
+            if (len > 1e-5) return {w / len, x / len, y / len, z / len};
             return identity();
+        }
+
+        bool isNormalized() const {
+
+            float len = (w * w + x * x + y * y + z * z);
+            float eps = 1e-5;
+            return len > 1.f - eps && len < 1.f + eps;
         }
 
         Vector3<float> rotate(Vector3<float> v) const
