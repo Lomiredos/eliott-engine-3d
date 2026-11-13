@@ -36,7 +36,7 @@ namespace ee::scene
 
     // Deplacement exprime dans le monde -> applique au transform local de
     // _e (tient compte de la rotation/echelle de son parent).
-    inline void moveWorld(ee::ecs::World &_w, ee::ecs::EntityID _e, const Vec3f &_delta)
+    inline void moveWorld(ee::ecs::World &_w, ee::ecs::EntityID _e, const ee::math::Vector3<float> &_delta)
     {
         TransformComponent &t = *_w.getComponent<TransformComponent>(_e);
         if (!t.parent || !_w.hasComponent<TransformComponent>(t.parent.id))
@@ -45,10 +45,10 @@ namespace ee::scene
             return;
         }
         Xform p = worldXform(_w, t.parent.id);
-        Quat inv{p.rot.w, -p.rot.x, -p.rot.y, -p.rot.z};
-        Vec3f d = inv.rotate(_delta);
+        ee::math::Quaternion inv{p.rot.w, -p.rot.x, -p.rot.y, -p.rot.z};
+        ee::math::Vector3<float> d = inv.rotate(_delta);
         auto safeDiv = [](float _a, float _b)
         { return std::fabs(_b) > 1e-6f ? _a / _b : _a; };
-        t.position += Vec3f{safeDiv(d.x, p.scale.x), safeDiv(d.y, p.scale.y), safeDiv(d.z, p.scale.z)};
+        t.position += ee::math::Vector3<float>{safeDiv(d.x, p.scale.x), safeDiv(d.y, p.scale.y), safeDiv(d.z, p.scale.z)};
     }
 }
