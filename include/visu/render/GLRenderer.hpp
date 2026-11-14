@@ -1,6 +1,8 @@
 #pragma once
 
+#include "math/Matrix.hpp"
 #include "math/Quaternion.hpp"
+#include "math/Vector3.hpp"
 #include "visu/core/Color3.hpp"
 #include "visu/render/Renderer.hpp"
 
@@ -41,47 +43,47 @@ public:
   void setTarget(int index);
 
   unsigned int texture() const { return m_targets[m_target].colorTex; }
-  void viewMatrix(float out[16]) const;
-  void projMatrix(float out[16]) const;
+  void viewMatrix(ee::math::Matrix<4, float> out) const;
+  void projMatrix(ee::math::Matrix<4, float> out) const;
 
-private:
-    bool isBuiltIn(MeshHandle mesh) const;
-    bool ensureInit();
-    void ensureFbo(int w, int h);
-    // (Re)compile le shader principal pour m_settings.maxPointLights lampes.
-    bool buildProgram();
+  private:
+  bool isBuiltIn(MeshHandle mesh) const;
+  bool ensureInit();
+  void ensureFbo(int w, int h);
+  // (Re)compile le shader principal pour m_settings.maxPointLights lampes.
+  bool buildProgram();
 
-    MeshHandle uploadMesh(const float* verts, int vertFloatCount, const unsigned int* idx, int idxCount);
+  MeshHandle uploadMesh(const float* verts, int vertFloatCount, const unsigned int* idx, int idxCount);
 
-    // Attache a un mesh (triangles) deja uploade un 2e jeu d'indices GL_LINES,
-    // fait des seules aretes "reelles" de la grille (sans les diagonales de
-    // triangulation) : c'est ce que drawWireMesh dessine pour les builtins.
-    void attachWireIndices(MeshHandle mesh, const unsigned int* idx, int idxCount);
+  // Attache a un mesh (triangles) deja uploade un 2e jeu d'indices GL_LINES,
+  // fait des seules aretes "reelles" de la grille (sans les diagonales de
+  // triangulation) : c'est ce que drawWireMesh dessine pour les builtins.
+  void attachWireIndices(MeshHandle mesh, const unsigned int* idx, int idxCount);
 
-    // Dessin immediat. faceSide : 0 = toutes les faces, 1 = arriere seules,
-    // -1 = avant seules (transparents).
-    void drawMeshNow(MeshHandle mesh, const float model[16], const Material& mat, int faceSide);
-    void drawWireNow(MeshHandle mesh, const float model[16], ee::Color3 col);
+  // Dessin immediat. faceSide : 0 = toutes les faces, 1 = arriere seules,
+  // -1 = avant seules (transparents).
+  void drawMeshNow(MeshHandle mesh, const ee::math::Matrix<4, float> model, const Material& mat, int faceSide);
+  void drawWireNow(MeshHandle mesh, const ee::math::Matrix<4, float> model, ee::Color3 col);
 
-    // Draw de la vue en cours, executes par flushView (beginView suivant,
-    // endScene) : il faut tous les objets avant l'eclairage pour les ombres.
-    enum class DrawKind { Opaque, Wire, Transparent };
-    struct Queued {
-        DrawKind kind = DrawKind::Opaque;
-        MeshHandle mesh = 0;
-        float model[16];
-        Material mat;        // Wire : couleur dans mat.albedo
-        float pos[3] = {};   // centre monde
-        float radius = 0.0f; // rayon englobant monde (tri des ombres de lampe)
-        float dist2 = 0.0f;  // distance^2 a la camera (tri des transparents)
-    };
+  // Draw de la vue en cours, executes par flushView (beginView suivant,
+  // endScene) : il faut tous les objets avant l'eclairage pour les ombres.
+  enum class DrawKind { Opaque, Wire, Transparent };
+  struct Queued {
+      DrawKind kind = DrawKind::Opaque;
+      MeshHandle mesh = 0;
+      ee::math::Matrix<4, float> model;
+      Material mat;                      // Wire : couleur dans mat.albedo
+      ee::math::Vector3<float> pos = {}; // centre monde
+      float radius = 0.0f;               // rayon englobant monde (tri des ombres de lampe)
+      float dist2 = 0.0f;                // distance^2 a la camera (tri des transparents)
+  };
   std::vector<Queued> m_queue;
   void flushView();
 
   // Ombres : passe de profondeur depuis le soleil / chaque face des lampes.
-  void renderSunShadow(float outVP[16]);
+  void renderSunShadow(ee::math::Matrix<4, float> outVP);
   void renderPointShadows(const std::vector<int> &rows);
-  void drawDepth(const Queued &q, const float vp[16]);
+  void drawDepth(const Queued& q, const ee::math::Matrix<4, float> vp);
   void ensureShadowTargets();
 
   // Lampes de la vue : les maxPointLights les plus proches de la camera, et
@@ -117,12 +119,12 @@ private:
       m_uOpacity = -1, m_uFaceSide = -1, m_uSunShadowOn = -1, m_uSunVP = -1,
       m_uSunTexel = -1, m_uSunNormalBias = -1, m_uPointShadowRow = -1,
       m_uPointShadowTile = -1, m_uPointShadowTexel = -1, m_uPointNear = -1;
-  void applyLights(bool sunShadow, const float sunVP[16], float sunTexelWorld);
+  void applyLights(bool sunShadow, const ee::math::Matrix<4, float> sunVP, float sunTexelWorld);
   Lights m_lights;
   RenderSettings m_settings;
   int m_programMaxPoints = 0; // maxPointLights du shader compile
-  float m_camPos[3] = {0.0f, 0.0f, 0.0f};
-  float m_camFwd[3] = {0.0f, 0.0f, -1.0f};
+  ee::math::Vector3<float> m_camPos = {0.0f, 0.0f, 0.0f};
+  ee::math::Vector3<float> m_camFwd = {0.0f, 0.0f, -1.0f};
   int m_viewGL[4] = {0, 0, 0, 0}; // viewport GL de la vue en cours
   unsigned int m_frameFbo = 0;    // FBO de l'image en cours
 
@@ -151,8 +153,8 @@ private:
   int m_frameW = 0, m_frameH = 0; // image en cours (beginFrame)
   bool m_frameOk = false;
 
-  float m_view[16] = {0};
-  float m_proj[16] = {0};
-  float m_vp[16] = {0};
+  ee::math::Matrix<4, float> m_view{};
+  ee::math::Matrix<4, float> m_proj{};
+  ee::math::Matrix<4, float> m_vp{};
 };
 } // namespace ee::render

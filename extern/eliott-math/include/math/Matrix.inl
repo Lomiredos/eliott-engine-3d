@@ -8,6 +8,55 @@ namespace ee::math {
 
     template <std::size_t N, std::floating_point T>
         requires(N >= 2)
+    constexpr T Matrix<N, T>::detPivotGauss() const noexcept {
+        Matrix a = *this;
+        int signe = 1;
+
+        auto switchline = [&a](std::size_t _a, std::size_t _b) {
+            for (std::size_t i = 0; i < N; ++i) {
+                std::swap(a(_a, i), a(_b, i));
+            }
+        };
+
+        auto substractline = [&a](std::size_t _a, std::size_t _b, T _k, std::size_t _c) {
+            for (std::size_t i = _c; i < N; i++) {
+                a(_a, i) -= a(_b, i) * _k;
+            }
+        };
+
+        for (std::size_t col = 0; col < N - 1; ++col) {
+            T max = a(col, col);
+            if (max < T(0)) max *= T(-1);
+            std::size_t p = col;
+            for (std::size_t l = col; l < N; ++l) {
+                if (T v = a(l, col) > T(0) ? a(l, col) : -a(l, col); v > max) {
+                    max = v;
+                    p = l;
+                }
+            }
+
+            if (max <= T(0)) return 0;
+
+            if (p != col) {
+                signe = -signe;
+                switchline(p, col);
+            }
+
+            for (std::size_t row = col + 1; row < N; ++row) {
+                T k = a(row, col) / a(col, col);
+                substractline(row, col, k, col);
+            }
+        }
+
+        T det = signe;
+        for (std::size_t i = 0; i < N; ++i) {
+            det *= a(i, i);
+        }
+        return det;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
     constexpr Matrix<N, T> Matrix<N, T>::identity() noexcept {
         Matrix mat{};
         for (std::size_t i = 0; i < N; ++i) {
@@ -368,6 +417,121 @@ namespace ee::math {
         r(1, 2) = n2.y;
         r(2, 2) = n2.z;
 
+        return r;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr T Matrix<N, T>::determinant() const noexcept {
+        if constexpr (N == 2) {
+            return (*this)(0, 0) * (*this)(1, 1) - (*this)(0, 1) * (*this)(1, 0);
+        } else if constexpr (N == 3) {
+            return (*this)(0, 0) * (*this)(1, 1) * (*this)(2, 2) + (*this)(0, 1) * (*this)(1, 2) * (*this)(2, 0) +
+                   (*this)(0, 2) * (*this)(1, 0) * (*this)(2, 1) - (*this)(2, 0) * (*this)(1, 1) * (*this)(0, 2) -
+                   (*this)(2, 1) * (*this)(1, 2) * (*this)(0, 0) - (*this)(2, 2) * (*this)(1, 0) * (*this)(0, 1);
+        } else {
+            return detPivotGauss();
+        }
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr std::optional<Matrix<N, T>> Matrix<N, T>::inverse(T _eps) const noexcept {
+        auto absT = [](T _x) { return _x < T(0) ? -_x : _x; };
+
+        if constexpr (N == 2) {
+            const T det = determinant();
+            if (absT(det) < _eps) return std::nullopt;
+
+            const T invDet = T(1) / det;
+            Matrix r{};
+            r(0, 0) = (*this)(1, 1) * invDet;
+            r(1, 1) = (*this)(0, 0) * invDet;
+            r(0, 1) = -(*this)(0, 1) * invDet;
+            r(1, 0) = -(*this)(1, 0) * invDet;
+            return r;
+        } else if constexpr (N == 3) {
+            const Vector3<T> c0{(*this)(0, 0), (*this)(1, 0), (*this)(2, 0)};
+            const Vector3<T> c1{(*this)(0, 1), (*this)(1, 1), (*this)(2, 1)};
+            const Vector3<T> c2{(*this)(0, 2), (*this)(1, 2), (*this)(2, 2)};
+
+            const Vector3<T> n0 = c1.Cross(c2);
+            const Vector3<T> n1 = c2.Cross(c0);
+            const Vector3<T> n2 = c0.Cross(c1);
+
+            const T det = c0.x * n0.x + c0.y * n0.y + c0.z * n0.z;
+            if (absT(det) < _eps) return std::nullopt;
+
+            const T invDet = T(1) / det;
+            const Vector3<T> rows[3]{n0, n1, n2};
+            Matrix r{};
+            for (std::size_t row = 0; row < 3; ++row) {
+                r(row, 0) = rows[row].x * invDet;
+                r(row, 1) = rows[row].y * invDet;
+                r(row, 2) = rows[row].z * invDet;
+            }
+            return r;
+        } else {
+            Matrix a = *this;
+            Matrix inv = identity();
+
+            for (std::size_t col = 0; col < N; ++col) {
+                std::size_t p = col;
+                T max = absT(a(col, col));
+                for (std::size_t row = col + 1; row < N; ++row) {
+                    if (const T v = absT(a(row, col)); v > max) {
+                        max = v;
+                        p = row;
+                    }
+                }
+                if (max < _eps) return std::nullopt;
+
+                if (p != col) {
+                    for (std::size_t i = 0; i < N; ++i) {
+                        std::swap(a(p, i), a(col, i));
+                        std::swap(inv(p, i), inv(col, i));
+                    }
+                }
+
+                const T invPivot = T(1) / a(col, col);
+                for (std::size_t i = 0; i < N; ++i) {
+                    a(col, i) *= invPivot;
+                    inv(col, i) *= invPivot;
+                }
+
+                for (std::size_t row = 0; row < N; ++row) {
+                    if (row == col) continue;
+                    const T k = a(row, col);
+                    if (k == T(0)) continue;
+                    for (std::size_t i = 0; i < N; ++i) {
+                        a(row, i) -= k * a(col, i);
+                        inv(row, i) -= k * inv(col, i);
+                    }
+                }
+            }
+            return inv;
+        }
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<N, T> Matrix<N, T>::inverseAffine() const noexcept
+        requires(N == 4)
+    {
+        const std::optional<Matrix<3, T>> inv3 = upperLeft3().inverse();
+        if (!inv3) return identity();
+
+        const Vector3<T> t = *inv3 * getTranslation();
+
+        Matrix r = identity();
+        for (std::size_t col = 0; col < 3; ++col) {
+            for (std::size_t row = 0; row < 3; ++row) {
+                r(row, col) = (*inv3)(row, col);
+            }
+        }
+        r(0, 3) = -t.x;
+        r(1, 3) = -t.y;
+        r(2, 3) = -t.z;
         return r;
     }
 } // namespace

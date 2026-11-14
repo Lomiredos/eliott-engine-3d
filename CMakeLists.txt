@@ -195,6 +195,20 @@ if(EE_BUILD_TESTS)
     target_link_libraries(ee-fsm-tests PRIVATE ee-fsm doctest::doctest)
     target_compile_definitions(ee-fsm-tests PRIVATE EE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME ee-fsm-tests COMMAND ee-fsm-tests)
+
+    add_executable(ee-math-tests
+        tests/math/main.cpp
+        tests/math/test_matrix.cpp
+        tests/math/test_quaternion.cpp
+        tests/math/test_matrix_transform.cpp
+        tests/math/test_matrix_camera.cpp
+        tests/math/test_matrix_apply.cpp
+        tests/math/test_matrix_inverse.cpp
+    )
+    target_include_directories(ee-math-tests PRIVATE extern/eliott-math/include)
+    target_link_libraries(ee-math-tests PRIVATE doctest::doctest)
+    target_compile_features(ee-math-tests PRIVATE cxx_std_20)
+    add_test(NAME ee-math-tests COMMAND ee-math-tests)
 endif()
 
 # ---------------------------------------------------------------------------
