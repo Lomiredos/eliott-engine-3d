@@ -97,6 +97,22 @@ namespace ee::math {
 
     template <std::size_t N, std::floating_point T>
         requires(N >= 2)
+    constexpr Vector3<T> Matrix<N, T>::operator*(const Vector3<T>& _v) const noexcept
+        requires(N == 3)
+    {
+        const T b[3]{_v.x, _v.y, _v.z};
+        T r[3]{};
+
+        for (std::size_t k = 0; k < 3; ++k) {
+            for (std::size_t row = 0; row < 3; ++row) {
+                r[row] += (*this)(row, k) * b[k];
+            }
+        }
+        return {r[0], r[1], r[2]};
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
     constexpr bool Matrix<N, T>::nearlyEqual(const Matrix& _o, T _eps) const noexcept {
         for (std::size_t i = 0; i < N * N; ++i)
             if (T d = m[i] - _o.m[i]; !((d > 0 ? d : -d) <= _eps)) return false;
@@ -183,4 +199,175 @@ namespace ee::math {
         return r;
     }
 
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<N, T> Matrix<N, T>::perspective(T _fovYRad, T _aspect, T _near, T _far) noexcept
+        requires(N == 4)
+    {
+        Matrix r{};
+        T t = std::tan(_fovYRad * T(0.5));
+        r(0, 0) = T(1) / (_aspect * t);
+        r(1, 1) = T(1) / t;
+        r(2, 2) = -(_far + _near) / (_far - _near);
+        r(2, 3) = -(T(2) * _far * _near) / (_far - _near);
+        r(3, 2) = -T(1);
+
+        return r;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<N, T> Matrix<N, T>::ortho(T _l, T _r, T _b, T _t, T _near, T _far) noexcept
+        requires(N == 4)
+    {
+        Matrix r{};
+        r(0, 0) = T(2) / (_r - _l);
+        r(1, 1) = T(2) / (_t - _b);
+        r(2, 2) = -T(2) / (_far - _near);
+
+        r(0, 3) = -(_r + _l) / (_r - _l);
+        r(1, 3) = -(_t + _b) / (_t - _b);
+        r(2, 3) = -(_far + _near) / (_far - _near);
+
+        r(3, 3) = T(1);
+
+        return r;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<N, T> Matrix<N, T>::lookAt(const Vector3<T>& _eye, const Vector3<T>& _center,
+                                                const Vector3<T>& _up) noexcept
+        requires(N == 4)
+    {
+        Vector3<T> f = _center - _eye;
+        f.Normalized();
+        Vector3<T> s{f.y * _up.z - f.z * _up.y, f.z * _up.x - f.x * _up.z, f.x * _up.y - f.y * _up.x};
+        s.Normalized();
+        Vector3<T> u{s.y * f.z - s.z * f.y, s.z * f.x - s.x * f.z, s.x * f.y - s.y * f.x};
+
+        Matrix r{};
+
+        r(0, 0) = s.x;
+        r(0, 1) = s.y;
+        r(0, 2) = s.z;
+
+        r(1, 0) = u.x;
+        r(1, 1) = u.y;
+        r(1, 2) = u.z;
+
+        r(2, 0) = -f.x;
+        r(2, 1) = -f.y;
+        r(2, 2) = -f.z;
+
+        r(0, 3) = -(s.x * _eye.x + s.y * _eye.y + s.z * _eye.z);
+        r(1, 3) = -(u.x * _eye.x + u.y * _eye.y + u.z * _eye.z);
+        r(2, 3) = (f.x * _eye.x + f.y * _eye.y + f.z * _eye.z);
+
+        r(3, 3) = T(1);
+        return r;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Vector3<T> Matrix<N, T>::getTranslation() const noexcept
+        requires(N == 4)
+    {
+        return {(*this)(0, 3), (*this)(1, 3), (*this)(2, 3)};
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Vector3<T> Matrix<N, T>::transformPoint(const Vector3<T>& _p) const noexcept
+        requires(N == 4)
+    {
+        const T b[3]{_p.x, _p.y, _p.z};
+        Vector3<T> trans = getTranslation();
+        T r[3]{trans.x, trans.y, trans.z};
+
+        for (std::size_t k = 0; k < 3; ++k) {
+            for (std::size_t row = 0; row < 3; ++row) {
+                r[row] += (*this)(row, k) * b[k];
+            }
+        }
+        return {r[0], r[1], r[2]};
+    }
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Vector3<T> Matrix<N, T>::projectPoint(const Vector3<T>& _p) const noexcept
+        requires(N == 4)
+    {
+        const T b[4]{_p.x, _p.y, _p.z, T(1)};
+        T r[4]{};
+
+        for (std::size_t k = 0; k < 4; ++k) {
+            for (std::size_t row = 0; row < 4; ++row) {
+                r[row] += (*this)(row, k) * b[k];
+            }
+        }
+        if (r[3] == T(0)) return {r[0], r[1], r[2]};
+        const T inv = T(1) / r[3];
+        return {r[0] * inv, r[1] * inv, r[2] * inv}; // 1 div + 3 mult coute moin cher que 3 div
+    }
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Vector3<T> Matrix<N, T>::transformDir(const Vector3<T>& _d) const noexcept
+        requires(N == 4)
+    {
+        const T b[3]{_d.x, _d.y, _d.z};
+        T r[3]{};
+
+        for (std::size_t k = 0; k < 3; ++k) {
+            for (std::size_t row = 0; row < 3; ++row) {
+                r[row] += (*this)(row, k) * b[k];
+            }
+        }
+        return {r[0], r[1], r[2]};
+    }
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<3, T> Matrix<N, T>::upperLeft3() const noexcept
+        requires(N == 4)
+    {
+        Matrix<3, T> r{};
+
+        for (std::size_t row = 0; row < 3; ++row) {
+            for (std::size_t col = 0; col < 3; ++col) {
+                r(row, col) = (*this)(row, col);
+            }
+        }
+        return r;
+    }
+
+    template <std::size_t N, std::floating_point T>
+        requires(N >= 2)
+    constexpr Matrix<3, T> Matrix<N, T>::normalMatrix() const noexcept
+        requires(N == 4)
+    {
+
+        Matrix<3, T> ul = upperLeft3();
+        Matrix<3, T> r{};
+
+        const Vector3<T> c0{ul(0, 0), ul(1, 0), ul(2, 0)};
+        const Vector3<T> c1{ul(0, 1), ul(1, 1), ul(2, 1)};
+        const Vector3<T> c2{ul(0, 2), ul(1, 2), ul(2, 2)};
+
+        const Vector3<T> n0 = c1.Cross(c2);
+        const Vector3<T> n1 = c2.Cross(c0);
+        const Vector3<T> n2 = c0.Cross(c1);
+
+        r(0, 0) = n0.x;
+        r(1, 0) = n0.y;
+        r(2, 0) = n0.z;
+
+        r(0, 1) = n1.x;
+        r(1, 1) = n1.y;
+        r(2, 1) = n1.z;
+
+        r(0, 2) = n2.x;
+        r(1, 2) = n2.y;
+        r(2, 2) = n2.z;
+
+        return r;
+    }
 } // namespace
