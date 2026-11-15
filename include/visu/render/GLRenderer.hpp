@@ -43,8 +43,8 @@ public:
   void setTarget(int index);
 
   unsigned int texture() const { return m_targets[m_target].colorTex; }
-  void viewMatrix(ee::math::Matrix<4, float> out) const;
-  void projMatrix(ee::math::Matrix<4, float> out) const;
+  void viewMatrix(ee::math::Matrix<4, float>& out) const;
+  void projMatrix(ee::math::Matrix<4, float>& out) const;
 
   private:
   bool isBuiltIn(MeshHandle mesh) const;

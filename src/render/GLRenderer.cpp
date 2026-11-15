@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------
 namespace {
 
-    void forwardFrom(float yaw, float pitch, ee::math::Vector3<float> out) {
+    void forwardFrom(float yaw, float pitch, ee::math::Vector3<float>& out) {
         float cp = std::cos(pitch), sp = std::sin(pitch);
         float cy = std::cos(yaw), sy = std::sin(yaw);
         out.x = cp * cy;
@@ -1396,7 +1396,7 @@ namespace ee::render
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // IMPORTANT : rendre la main a ImGui
     }
 
-    void GLRenderer::viewMatrix(ee::math::Matrix<4, float> out) const { out = m_view; }
+    void GLRenderer::viewMatrix(ee::math::Matrix<4, float>& out) const { out = m_view; }
 
-    void GLRenderer::projMatrix(ee::math::Matrix<4, float> out) const { out = m_proj; }
+    void GLRenderer::projMatrix(ee::math::Matrix<4, float>& out) const { out = m_proj; }
 }
