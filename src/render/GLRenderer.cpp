@@ -796,7 +796,7 @@ namespace ee::render
 
         m_view = view;
         m_proj = proj;
-        m_vp = view;
+        m_vp = vp;
 
         // GL compte y depuis le bas ; Viewport depuis le haut.
         int glY = m_frameH - v.y - v.h;
@@ -1065,7 +1065,7 @@ namespace ee::render
 
     // Matrice model = translate * rotation * scale, centre et rayon monde.
     static void queuedTransform(ee::math::Vector3<float> pos, ee::math::Vector3<float> scale, ee::math::Quaternion rot,
-                                float meshRadius, ee::math::Matrix<4, float> outModel, ee::math::Vector3<float> outPos,
+                                float meshRadius, ee::math::Matrix<4, float>& outModel, ee::math::Vector3<float>& outPos,
                                 float& outRadius) {
         ee::math::Matrix<4, float> model = ee::math::Matrix<4, float>::fromTRS(pos, rot, scale);
         outModel = model;
@@ -1142,7 +1142,7 @@ namespace ee::render
     // Shadow map du soleil : boite orthographique couvrant sunShadowDistance
     // devant la camera, vue depuis le soleil. Le centre est cale sur la
     // grille des texels pour que l'ombre ne scintille pas quand on bouge.
-    void GLRenderer::renderSunShadow(ee::math::Matrix<4, float> outVP) {
+    void GLRenderer::renderSunShadow(ee::math::Matrix<4, float>& outVP) {
         const float D = m_settings.sun.distance;
         const float h = D * 0.5f;
         ee::math::Vector3<float> dir = m_lights.sun->dir;

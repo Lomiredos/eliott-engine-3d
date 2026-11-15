@@ -81,7 +81,7 @@ public:
   void flushView();
 
   // Ombres : passe de profondeur depuis le soleil / chaque face des lampes.
-  void renderSunShadow(ee::math::Matrix<4, float> outVP);
+  void renderSunShadow(ee::math::Matrix<4, float>& outVP);
   void renderPointShadows(const std::vector<int> &rows);
   void drawDepth(const Queued& q, const ee::math::Matrix<4, float> vp);
   void ensureShadowTargets();
