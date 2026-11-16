@@ -204,6 +204,7 @@ if(EE_BUILD_TESTS)
         tests/math/test_matrix_camera.cpp
         tests/math/test_matrix_apply.cpp
         tests/math/test_matrix_inverse.cpp
+        tests/math/test_matrix_decompose.cpp
     )
     target_include_directories(ee-math-tests PRIVATE extern/eliott-math/include)
     target_link_libraries(ee-math-tests PRIVATE doctest::doctest)

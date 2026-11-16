@@ -8,6 +8,7 @@
 struct RigidBodyComponent {
   ee::math::Vector3<float> velocity{0.0f, 0.0f, 0.0f};
   bool isStatic = false;
+  bool isAffectByGravity = true;
 };
 
 template <> struct ee::reflection::Reflect<RigidBodyComponent> {
@@ -16,5 +17,6 @@ template <> struct ee::reflection::Reflect<RigidBodyComponent> {
   static void visit(RigidBodyComponent &_c, ee::reflection::FieldVisitor &_v) {
     _v.visit("Velocity", _c.velocity);
     _v.visit("IsStatic", _c.isStatic);
+    _v.visit("IsAffectByGravity", _c.isAffectByGravity);
   }
 };
