@@ -4,3 +4,6 @@
 [submodule "extern/eliott-input"]
 	path = extern/eliott-input
 	url = https://github.com/Lomiredos/eliott-input
+[submodule "extern/eliott-math"]
+	path = extern/eliott-math
+	url = https://github.com/Lomiredos/eliott-math
