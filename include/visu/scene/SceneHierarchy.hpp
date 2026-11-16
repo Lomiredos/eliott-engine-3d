@@ -14,7 +14,7 @@
 
 #include "visu/core/SceneInfo.hpp"
 #include "math/Quaternion.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 #include <cmath>
 #include <string>
@@ -24,19 +24,19 @@
 namespace ee::scene {
     struct Xform
     {
-        ee::math::Vector3<float> pos;
-        ee::math::Quaternion rot;
-        ee::math::Vector3<float> scale{1.0f, 1.0f, 1.0f};
+        ee::math::Vector<3, float> pos;
+        ee::math::Quaternion<float> rot;
+        ee::math::Vector<3, float> scale{1.0f, 1.0f, 1.0f};
 
-        ee::math::Vector3<float> eulerDeg;
+        ee::math::Vector<3, float> eulerDeg;
     };
 
-    inline Xform makeXform(ee::math::Vector3<float> _pos, ee::math::Vector3<float> _eulerDeg,
-                           ee::math::Vector3<float> _scale) {
+    inline Xform makeXform(ee::math::Vector<3, float> _pos, ee::math::Vector<3, float> _eulerDeg,
+                           ee::math::Vector<3, float> _scale) {
         Xform x;
         x.pos = _pos;
         x.eulerDeg = _eulerDeg;
-        x.rot = ee::math::Quaternion::fromEulerDeg(_eulerDeg);
+        x.rot = ee::math::Quaternion<float>::fromEulerDeg(_eulerDeg);
         x.scale = _scale;
         return x;
     }
@@ -58,7 +58,7 @@ namespace ee::scene {
         auto safeDiv = [](float _a, float _b)
         { return std::fabs(_b) > 1e-6f ? _a / _b : _a; };
         ee::math::Quaternion inv{_parent.rot.w, -_parent.rot.x, -_parent.rot.y, -_parent.rot.z};
-        ee::math::Vector3<float> p = inv.rotate(_world.pos - _parent.pos);
+        ee::math::Vector<3, float> p = inv.rotate(_world.pos - _parent.pos);
 
         Xform l;
         l.pos = {safeDiv(p.x, _parent.scale.x), safeDiv(p.y, _parent.scale.y),
@@ -108,14 +108,14 @@ namespace ee::scene {
             return std::string(_group) + "." + _field;
         }
 
-        inline ee::math::Vector3<float> readVec3(const ComponentInstance& _c, const char* _name,
-                                                 ee::math::Vector3<float> _def) {
+        inline ee::math::Vector<3, float> readVec3(const ComponentInstance& _c, const char* _name,
+                                                   ee::math::Vector<3, float> _def) {
             return {detail::num(_c, fieldKey(_name, "x"), _def.x),
                     detail::num(_c, fieldKey(_name, "y"), _def.y),
                     detail::num(_c, fieldKey(_name, "z"), _def.z)};
         }
 
-        inline void writeVec3(ComponentInstance& _c, const char* _name, const ee::math::Vector3<float>& _v) {
+        inline void writeVec3(ComponentInstance& _c, const char* _name, const ee::math::Vector<3, float>& _v) {
             _c.values[fieldKey(_name, "x")] = _v.x;
             _c.values[fieldKey(_name, "y")] = _v.y;
             _c.values[fieldKey(_name, "z")] = _v.z;
@@ -154,12 +154,11 @@ namespace ee::scene {
     // coupees (l'entite qui ferme la boucle devient racine).
     inline std::vector<int> sceneParents(const SceneInfo &_scene)
     {
-        const int n = static_cast<int>(_scene.entities.size());
+        const size_t n = _scene.entities.size();
         std::vector<int> parents(n);
-        for (int i = 0; i < n; ++i)
-            parents[i] = declaredParent(_scene, i);
-        for (int i = 0; i < n; ++i)
-        {
+        for (size_t i = 0; i < n; ++i)
+            parents[i] = declaredParent(_scene, int(i));
+        for (size_t i = 0; i < n; ++i) {
             int p = parents[i];
             for (int steps = 0; p >= 0; ++steps)
             {

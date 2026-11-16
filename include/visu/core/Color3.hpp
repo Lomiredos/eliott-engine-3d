@@ -35,7 +35,7 @@ namespace ee
         unsigned int r = 0, g = 0, b = 0;
         if (std::string(p).size() != 6 || std::sscanf(p, "%02x%02x%02x", &r, &g, &b) != 3)
             return false;
-        _out = {r / 255.0f, g / 255.0f, b / 255.0f};
+        _out = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f, static_cast<float>(b) / 255.0f};
         return true;
     }
 }

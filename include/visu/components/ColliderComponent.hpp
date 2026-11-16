@@ -3,7 +3,7 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 enum class ColliderShape : int
 {
@@ -25,8 +25,8 @@ struct ColliderComponent
 
     ColliderShape shape = ColliderShape::Sphere;
 
-    ee::math::Vector3<float> offset{0.0f, 0.0f, 0.0f};
-    ee::math::Vector3<float> euler{0.0f, 0.0f, 0.0f};
+    ee::math::Vector<3, float> offset{0.0f, 0.0f, 0.0f};
+    ee::math::Vector<3, float> euler{0.0f, 0.0f, 0.0f};
 
     bool isActive = true;
     bool isTrigger = false;
@@ -34,7 +34,7 @@ struct ColliderComponent
     // specific
 
     float radius = 1.0f;
-    ee::math::Vector3<float> halfExtents{0.5f, 0.5f, 0.5f};
+    ee::math::Vector<3, float> halfExtents{0.5f, 0.5f, 0.5f};
     float height = 2.0f;
 };
 

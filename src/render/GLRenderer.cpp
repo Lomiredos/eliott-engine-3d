@@ -1,6 +1,6 @@
 #include "visu/render/GLRenderer.hpp"
 #include "math/Matrix.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
 #include "visu/render/Renderer.hpp"
 
@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------
 namespace {
 
-    void forwardFrom(float yaw, float pitch, ee::math::Vector3<float>& out) {
+    void forwardFrom(float yaw, float pitch, ee::math::Vector<3, float>& out) {
         float cp = std::cos(pitch), sp = std::sin(pitch);
         float cy = std::cos(yaw), sy = std::sin(yaw);
         out.x = cp * cy;
@@ -784,11 +784,11 @@ namespace ee::render
             return;
 
         // Matrices derivees de la camera-donnee (aspect = celui de la vue)
-        ee::math::Vector3<float> eye = {cam.pos.x, cam.pos.y, cam.pos.z};
-        ee::math::Vector3<float> fwd;
+        ee::math::Vector<3, float> eye = {cam.pos.x, cam.pos.y, cam.pos.z};
+        ee::math::Vector<3, float> fwd;
         forwardFrom(cam.yaw, cam.pitch, fwd);
-        ee::math::Vector3<float> ctr = {eye.x + fwd.x, eye.y + fwd.y, eye.z + fwd.z};
-        ee::math::Vector3<float> up = {0.0f, 1.0f, 0.0f};
+        ee::math::Vector<3, float> ctr = {eye.x + fwd.x, eye.y + fwd.y, eye.z + fwd.z};
+        ee::math::Vector<3, float> up = {0.0f, 1.0f, 0.0f};
         ee::math::Matrix<4, float> proj = ee::math::Matrix<4, float>::perspective(
             cam.fovDeg * 3.14159265f / 180.0f, (float)v.w / (float)v.h, cam.nearZ, cam.farZ);
         ee::math::Matrix<4, float> view = ee::math::Matrix<4, float>::lookAt(eye, ctr, up);
@@ -819,7 +819,7 @@ namespace ee::render
     }
 
     // Couleur sRGB * intensite -> lineaire (ce qu'attend le shader).
-    static ee::math::Vector3<float> linearColor(const ee::Color3& _c, float _intensity) {
+    static ee::math::Vector<3, float> linearColor(const ee::Color3& _c, float _intensity) {
         return {std::pow(_c.r, 2.2f) * _intensity, std::pow(_c.g, 2.2f) * _intensity,
                 std::pow(_c.b, 2.2f) * _intensity};
     }
@@ -875,7 +875,7 @@ namespace ee::render
     }
 
     void GLRenderer::applyLights(bool sunShadow, const ee::math::Matrix<4, float> sunVP, float sunTexelWorld) {
-        ee::math::Vector3<float> c = linearColor(m_lights.ambient, m_lights.ambientIntensity);
+        ee::math::Vector<3, float> c = linearColor(m_lights.ambient, m_lights.ambientIntensity);
         glUniform3f(m_uAmbient, c.x, c.y, c.z);
         glUniform1i(m_uSunOn, m_lights.sun ? 1 : 0);
         if (m_lights.sun) {
@@ -900,7 +900,7 @@ namespace ee::render
             pos[i * 3] = p.pos.x;
             pos[i * 3 + 1] = p.pos.y;
             pos[i * 3 + 2] = p.pos.z;
-            const ee::math::Vector3<float> lc = linearColor(p.color, p.intensity);
+            const ee::math::Vector<3, float> lc = linearColor(p.color, p.intensity);
             col[i * 3] = lc.x;
             col[i * 3 + 1] = lc.y;
             col[i * 3 + 2] = lc.z;
@@ -1064,9 +1064,9 @@ namespace ee::render
     }
 
     // Matrice model = translate * rotation * scale, centre et rayon monde.
-    static void queuedTransform(ee::math::Vector3<float> pos, ee::math::Vector3<float> scale, ee::math::Quaternion rot,
-                                float meshRadius, ee::math::Matrix<4, float>& outModel, ee::math::Vector3<float>& outPos,
-                                float& outRadius) {
+    static void queuedTransform(ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                                ee::math::Quaternion<float> rot, float meshRadius, ee::math::Matrix<4, float>& outModel,
+                                ee::math::Vector<3, float>& outPos, float& outRadius) {
         ee::math::Matrix<4, float> model = ee::math::Matrix<4, float>::fromTRS(pos, rot, scale);
         outModel = model;
         outPos = pos;
@@ -1074,8 +1074,8 @@ namespace ee::render
         outRadius = meshRadius * std::max(sx, std::max(sy, sz));
     }
 
-    void GLRenderer::drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                              ee::math::Quaternion rot, const Material& mat) {
+    void GLRenderer::drawMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                              ee::math::Quaternion<float> rot, const Material& mat) {
         if (!m_init || mesh == 0 || mesh > m_meshes.size() || m_meshes[mesh - 1].vao == 0) return;
         Queued q;
         q.kind = mat.transparent ? DrawKind::Transparent : DrawKind::Opaque;
@@ -1087,8 +1087,8 @@ namespace ee::render
         m_queue.push_back(q);
     }
 
-    void GLRenderer::drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                                  ee::math::Quaternion rot, ee::Color3 col) {
+    void GLRenderer::drawWireMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                                  ee::math::Quaternion<float> rot, ee::Color3 col) {
         if (!m_init || mesh == 0 || mesh > m_meshes.size() || m_meshes[mesh - 1].vao == 0) return;
         Queued q;
         q.kind = DrawKind::Wire;
@@ -1145,19 +1145,19 @@ namespace ee::render
     void GLRenderer::renderSunShadow(ee::math::Matrix<4, float>& outVP) {
         const float D = m_settings.sun.distance;
         const float h = D * 0.5f;
-        ee::math::Vector3<float> dir = m_lights.sun->dir;
-        dir.Normalized();
+        ee::math::Vector<3, float> dir = m_lights.sun->dir;
+        dir.normalize();
 
-        ee::math::Vector3<float> up = {0.0f, 1.0f, 0.0f};
+        ee::math::Vector<3, float> up = {0.0f, 1.0f, 0.0f};
         if (std::fabs(dir.y) > 0.99f) {
             up.x = 1.0f;
             up.y = 0.0f;
         }
-        const ee::math::Vector3<float> origin{};
+        const ee::math::Vector<3, float> origin{};
         ee::math::Matrix<4, float> view = ee::math::Matrix<4, float>::lookAt(origin, dir, up); // rotation seule
 
-        ee::math::Vector3<float> ctr = {m_camPos.x + m_camFwd.x * h, m_camPos.y + m_camFwd.y * h,
-                                        m_camPos.z + m_camFwd.z * h};
+        ee::math::Vector<3, float> ctr = {m_camPos.x + m_camFwd.x * h, m_camPos.y + m_camFwd.y * h,
+                                          m_camPos.z + m_camFwd.z * h};
         float cx = view.m[0] * ctr.x + view.m[4] * ctr.y + view.m[8] * ctr.z;
         float cy = view.m[1] * ctr.x + view.m[5] * ctr.y + view.m[9] * ctr.z;
         float cz = view.m[2] * ctr.x + view.m[6] * ctr.y + view.m[10] * ctr.z;
@@ -1192,15 +1192,15 @@ namespace ee::render
             if (row < 0)
                 continue;
             const PointLight &p = m_activePoints[li];
-            ee::math::Vector3<float> eye = p.pos;
+            ee::math::Vector<3, float> eye = p.pos;
             float range = std::max(p.range, kPointShadowNear * 2.0f);
             ee::math::Matrix<4, float> proj =
                 ee::math::Matrix<4, float>::perspective(3.14159265f * 0.5f, 1.0f, kPointShadowNear, range);
             for (int f = 0; f < 6; ++f)
             {
                 const float *F = kCubeFaces[f][0];
-                ee::math::Vector3<float> ctr = {eye.x + F[0], eye.y + F[1], eye.z + F[2]};
-                ee::math::Vector3<float> faces = {kCubeFaces[f][1][0], kCubeFaces[f][1][1], kCubeFaces[f][1][2]};
+                ee::math::Vector<3, float> ctr = {eye.x + F[0], eye.y + F[1], eye.z + F[2]};
+                ee::math::Vector<3, float> faces = {kCubeFaces[f][1][0], kCubeFaces[f][1][1], kCubeFaces[f][1][2]};
                 ee::math::Matrix<4, float> vp = proj * ee::math::Matrix<4, float>::lookAt(eye, ctr, faces);
                 glViewport(f * m_pointTile, row * m_pointTile, m_pointTile, m_pointTile);
                 for (const Queued &q : m_queue)

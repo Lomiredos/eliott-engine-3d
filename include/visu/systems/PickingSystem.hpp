@@ -1,7 +1,7 @@
 #pragma once
 
 #include "visu/core/SceneInfo.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 // ---------------------------------------------------------------------------
 // Picking : quelle entite un rayon touche-t-il ?
@@ -22,8 +22,8 @@ namespace ee::systems
     // Rayon en donnees pures. _dir est suppose normalise.
     struct Ray
     {
-        ee::math::Vector3<float> origin;
-        ee::math::Vector3<float> dir;
+        ee::math::Vector<3, float> origin;
+        ee::math::Vector<3, float> dir;
     };
 
     // Renvoie l'index de l'entite touchee la plus proche par _ray, ou -1.

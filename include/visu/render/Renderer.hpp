@@ -3,14 +3,14 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "math/Quaternion.hpp"
 #include "visu/core/Color3.hpp"
 
 namespace ee::render {
 
     struct Camera {
-        ee::math::Vector3<float> pos;
+        ee::math::Vector<3, float> pos;
         float yaw = 0.0f;
         float pitch = 0.0f;
         float fovDeg = 45.0f;
@@ -51,7 +51,7 @@ namespace ee::render {
     };
 
     struct PointLight {
-        ee::math::Vector3<float> pos;
+        ee::math::Vector<3, float> pos;
         ee::Color3 color;
         float intensity = 5.0f;
         float range = 10.0f;
@@ -59,7 +59,7 @@ namespace ee::render {
     };
 
     struct DirectionalLight {
-        ee::math::Vector3<float> dir{-0.5f, -1.0f, -0.3f};
+        ee::math::Vector<3, float> dir{-0.5f, -1.0f, -0.3f};
         ee::Color3 color;
         float intensity = 2.5f;
         bool castShadows = true;
@@ -128,12 +128,12 @@ namespace ee::render {
                                       int indexCount) = 0;
 
         virtual void destroyMesh(MeshHandle mesh) = 0;
-        virtual void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                              ee::math::Quaternion rot, const Material& mat) = 0;
+        virtual void drawMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                              ee::math::Quaternion<float> rot, const Material& mat) = 0;
 
         // Raccourci : materiau uni de cette couleur.
-        void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                      ee::math::Quaternion rot, ee::Color3 col) {
+        void drawMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                      ee::math::Quaternion<float> rot, ee::Color3 col) {
             Material m;
             m.albedo = col;
             drawMesh(mesh, pos, scale, rot, m);
@@ -141,7 +141,7 @@ namespace ee::render {
 
         // Meme mesh, dessine en fil de fer (aretes) : pour les contours de debug
         // (ex. forme d'un collider), jamais pour le rendu plein des composants.
-        virtual void drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                                  ee::math::Quaternion rot, ee::Color3 col) = 0;
+        virtual void drawWireMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                                  ee::math::Quaternion<float> rot, ee::Color3 col) = 0;
     };
 } // namespace ee::render

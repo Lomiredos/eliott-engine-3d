@@ -4,7 +4,7 @@
 #include "visu/reflect/FieldVisitor.hpp"
 
 #include "math/Quaternion.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 #include "visu/core/EntityRef.hpp"
 
@@ -12,9 +12,9 @@
 // le transform monde se calcule avec ee::scene::worldXform (Hierarchy.hpp).
 struct TransformComponent
 {
-    ee::math::Vector3<float> position{0.0f, 0.0f, 0.0f};
-    ee::math::Vector3<float> euler{0.0f, 0.0f, 0.0f};
-    ee::math::Vector3<float> scale{1.0f, 1.0f, 1.0f};
+    ee::math::Vector<3, float> position{0.0f, 0.0f, 0.0f};
+    ee::math::Vector<3, float> euler{0.0f, 0.0f, 0.0f};
+    ee::math::Vector<3, float> scale{1.0f, 1.0f, 1.0f};
     ee::EntityRefOf<TransformComponent> parent; // aucun = racine
 
     // Axes unitaires tires de euler (convention du moteur : forward = -Z).
@@ -24,9 +24,9 @@ struct TransformComponent
     {
         return ee::math::Quaternion::fromEulerDeg(euler.x, euler.y, euler.z);
     }
-    ee::math::Vector3<float> getForward() const { return getRotation().forward(); }
-    ee::math::Vector3<float> getUp() const { return getRotation().up(); }
-    ee::math::Vector3<float> getRight() const { return getRotation().right(); }
+    ee::math::Vector<3, float> getForward() const { return getRotation().forward(); }
+    ee::math::Vector<3, float> getUp() const { return getRotation().up(); }
+    ee::math::Vector<3, float> getRight() const { return getRotation().right(); }
 };
 
 template <>

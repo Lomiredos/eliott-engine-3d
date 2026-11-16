@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 #include <filesystem>
 #include <string>
@@ -10,8 +10,8 @@ namespace ee::core {
 struct CpuMesh {
   std::vector<float> verts; // format ee::render::kVertexFloats (MeshUtil.hpp)
   std::vector<unsigned int> idx;
-  ee::math::Vector3<float> aabbMin;
-  ee::math::Vector3<float> aabbMax;
+  ee::math::Vector<3, float> aabbMin;
+  ee::math::Vector<3, float> aabbMax;
   unsigned int gpu = 0;
   bool valid = false;
 };

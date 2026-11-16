@@ -2,7 +2,7 @@
 
 #include "math/Matrix.hpp"
 #include "math/Quaternion.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
 #include "visu/render/Renderer.hpp"
 
@@ -27,13 +27,13 @@ public:
   MeshHandle createMesh(const float *verts, int vertFloatCount,
                         const unsigned int *indices, int indexCount) override;
   using IRenderer::drawMesh; // garde le raccourci drawMesh(..., Color)
-  void drawMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale, ee::math::Quaternion rot,
-                const Material& mat) override;
+  void drawMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                ee::math::Quaternion<float> rot, const Material& mat) override;
   void setLights(const Lights &lights) override;
   void setSettings(const RenderSettings &settings) override;
   TextureHandle loadTexture(const std::string &path, bool srgb) override;
-  void drawWireMesh(MeshHandle mesh, ee::math::Vector3<float> pos, ee::math::Vector3<float> scale,
-                    ee::math::Quaternion rot, ee::Color3 col) override;
+  void drawWireMesh(MeshHandle mesh, ee::math::Vector<3, float> pos, ee::math::Vector<3, float> scale,
+                    ee::math::Quaternion<float> rot, ee::Color3 col) override;
 
   void setOffscreen(bool offscreen) { m_offscreen = offscreen; }
 
@@ -73,7 +73,7 @@ public:
       MeshHandle mesh = 0;
       ee::math::Matrix<4, float> model;
       Material mat;                      // Wire : couleur dans mat.albedo
-      ee::math::Vector3<float> pos = {}; // centre monde
+      ee::math::Vector<3, float> pos = {}; // centre monde
       float radius = 0.0f;               // rayon englobant monde (tri des ombres de lampe)
       float dist2 = 0.0f;                // distance^2 a la camera (tri des transparents)
   };
@@ -123,8 +123,8 @@ public:
   Lights m_lights;
   RenderSettings m_settings;
   int m_programMaxPoints = 0; // maxPointLights du shader compile
-  ee::math::Vector3<float> m_camPos = {0.0f, 0.0f, 0.0f};
-  ee::math::Vector3<float> m_camFwd = {0.0f, 0.0f, -1.0f};
+  ee::math::Vector<3, float> m_camPos = {0.0f, 0.0f, 0.0f};
+  ee::math::Vector<3, float> m_camFwd = {0.0f, 0.0f, -1.0f};
   int m_viewGL[4] = {0, 0, 0, 0}; // viewport GL de la vue en cours
   unsigned int m_frameFbo = 0;    // FBO de l'image en cours
 
@@ -148,7 +148,7 @@ public:
     int w = 0, h = 0;
   };
   std::vector<Target> m_targets = std::vector<Target>(1);
-  int m_target = 0;
+  std::size_t m_target = 0;
 
   int m_frameW = 0, m_frameH = 0; // image en cours (beginFrame)
   bool m_frameOk = false;

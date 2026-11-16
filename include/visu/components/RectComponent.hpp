@@ -3,12 +3,12 @@
 #include "visu/reflect/Reflect.hpp"
 #include "visu/reflect/FieldVisitor.hpp"
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 
 struct RectComponent
 {
 
-    ee::math::Vector3<float> size{1.0f, 1.0f, 1.0f};
+    ee::math::Vector<3, float> size{1.0f, 1.0f, 1.0f};
 };
 
 template <>

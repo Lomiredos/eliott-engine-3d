@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "math/Quaternion.hpp"
 
 #include "visu/core/Color3.hpp"
@@ -48,19 +48,19 @@ namespace ee::reflection
         // [[maybe_unused]] sert a dire au compilateur -> c'est ok que j'utilise pas l'arg qui vien apres dans la fonction, et a pas se tapper de warning
         //vus qu'on l'utilise dans les fonction qui override celle ci
 
-        void visit(const char *_name, ee::math::Vector3<float> &_value){
+        void visit(const char* _name, ee::math::Vector<3, float>& _value) {
             beginGroup(_name);
             visit("x", _value.x);
             visit("y", _value.y);
             visit("z", _value.z);
             endGroup();
         }
-        void visit(const char *_name, ee::math::Quaternion &_value){
+        void visit(const char* _name, ee::math::Quaternion<float>& _value) {
             beginGroup(_name);
-            visit("w", _value.w);
             visit("x", _value.x);
             visit("y", _value.y);
             visit("z", _value.z);
+            visit("w", _value.w);
             endGroup();
         }
 

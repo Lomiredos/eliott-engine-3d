@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math/Quaternion.hpp"
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
 #include "visu/core/SceneInfo.hpp"
 
@@ -16,18 +16,18 @@ namespace ee::systems {
 
     struct ColliderWireDesc {
         std::string shape = "Sphere"; // "Sphere", "Box" ou "Capsule"
-        ee::math::Vector3<float> offset;
-        ee::math::Quaternion quat;
+        ee::math::Vector<3, float> offset;
+        ee::math::Quaternion<float> quat;
         float radius = 1.0f;
-        ee::math::Vector3<float> halfExtents{0.5f, 0.5f, 0.5f};
+        ee::math::Vector<3, float> halfExtents{0.5f, 0.5f, 0.5f};
         float height = 2.0f;
     };
 
-    void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat,
-                          ee::math::Vector3<float> scale, const ColliderWireDesc& col);
+    void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                          ee::math::Vector<3, float> scale, const ColliderWireDesc& col);
 
-    ee::render::Camera cameraFromTransform(ee::math::Vector3<float> pos, ee::math::Quaternion quat, float fovDeg,
-                                           float nearZ, float farZ);
+    ee::render::Camera cameraFromTransform(ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                                           float fovDeg, float nearZ, float farZ);
 
     struct SceneCamera {
         int entity = -1;
@@ -44,7 +44,7 @@ namespace ee::systems {
 
     // Petite camera fil de fer (boitier + objectif vers -Z local) : rend visible
     // dans l'editeur une entite camera, qui n'a pas de forme a elle.
-    void drawCameraGizmo(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat,
+    void drawCameraGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
                          bool selected);
 
     // Materiau uni d'une couleur (formes sans MaterialComponent).
@@ -60,6 +60,6 @@ namespace ee::systems {
 
     // Lumiere en fil de fer pour l'editeur : petite sphere, + fleche (soleil)
     // ou portee (ampoule selectionnee).
-    void drawLightGizmo(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat,
+    void drawLightGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
                         bool directional, float range, bool selected);
 } // namespace ee::systems

@@ -11,7 +11,7 @@
 
 #include "ecs/World.hpp"
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "visu/render/Renderer.hpp"
 #include "visu/core/MeshStore.hpp"
 
@@ -47,7 +47,7 @@ namespace ee::scene
             if (_w.hasComponent<DirectionalLightComponent>(e) && !sunSet)
             {
                 const DirectionalLightComponent &l = *_w.getComponent<DirectionalLightComponent>(e);
-                ee::math::Vector3<float> f = worldXform(_w, e).rot.forward();
+                ee::math::Vector<3, float> f = worldXform(_w, e).rot.forward();
                 lights.sun->dir = {f.x, f.y, f.z};
                 lights.sun->color = {l.color.r, l.color.g, l.color.b};
                 lights.sun->intensity = l.intensity;
@@ -124,13 +124,13 @@ namespace ee::scene
                 float hh = cc.height * scy;
                 ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
 
-                _r.drawMesh(_r.builtin(ee::render::Prim::Cylinder), wx.pos, ee::math::Vector3<float>{rr, hh, rr},
+                _r.drawMesh(_r.builtin(ee::render::Prim::Cylinder), wx.pos, ee::math::Vector<3, float>{rr, hh, rr},
                             wx.rot, capCol);
 
-                ee::math::Vector3<float> off = wx.rot.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-                ee::math::Vector3<float> top{wx.pos.x + off.x, wx.pos.y + off.y, wx.pos.z + off.z};
-                ee::math::Vector3<float> bot{wx.pos.x - off.x, wx.pos.y - off.y, wx.pos.z - off.z};
-                ee::math::Vector3<float> sphR{rr, rr, rr};
+                ee::math::Vector<3, float> off = wx.rot.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
+                ee::math::Vector<3, float> top{wx.pos.x + off.x, wx.pos.y + off.y, wx.pos.z + off.z};
+                ee::math::Vector<3, float> bot{wx.pos.x - off.x, wx.pos.y - off.y, wx.pos.z - off.z};
+                ee::math::Vector<3, float> sphR{rr, rr, rr};
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), top, sphR, wx.rot, capCol);
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), bot, sphR, wx.rot, capCol);
             }

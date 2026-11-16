@@ -1,4 +1,5 @@
 #include "visu/core/MeshStore.hpp"
+#include "math/Vector.hpp"
 #include "visu/render/MeshUtil.hpp"
 
 #include <algorithm>
@@ -12,7 +13,7 @@ namespace {
 }
 
 namespace {
-using Vec3 = ee::math::Vector3<float>;
+using Vec3 = ee::math::Vector<3, float>;
 
 // "p", "p/t", "p//n" ou "p/t/n" (index 1-based, ou negatifs = depuis la fin).
 void parseFaceToken(const std::string &_tok, int _posCount, int _uvCount,
@@ -92,7 +93,7 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
             continue;
 
           // Normale : celle du .obj si dispo, sinon normale de face.
-          Vec3 faceN = (pos[1] - pos[0]).Cross(pos[2] - pos[0]).Normalize();
+          Vec3 faceN = cross((pos[1] - pos[0]), (pos[2] - pos[0])).normalized();
           for (int k = 0; k < 3; ++k) {
             Vec3 n = (ni[k] >= 0 && ni[k] < (int)normals.size())
                          ? normals[ni[k]]

@@ -41,15 +41,14 @@ endif()
 # Reflexion -> catalogue de composants (Components.json). A part d'ee-core :
 # gen_components n'a besoin que de ca (+ headers), pas du rendu, de glfw...
 # ---------------------------------------------------------------------------
+add_subdirectory(extern/eliott-math)
+
 add_library(ee-reflect STATIC src/reflect/CatalogGen.cpp)
-target_include_directories(ee-reflect PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
-)
+target_include_directories(ee-reflect PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(gen_standard_catalog EXCLUDE_FROM_ALL tools/gen_standard_catalog_main.cpp)
 target_link_libraries(gen_standard_catalog PRIVATE ee-reflect)
 
-target_link_libraries(ee-reflect PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(ee-reflect PUBLIC nlohmann_json::nlohmann_json eliott::math)
 
 # ---------------------------------------------------------------------------
 # Trois bibliotheques, de la plus legere a la plus complete :
@@ -75,12 +74,11 @@ add_library(ee-format STATIC
 )
 target_include_directories(ee-format PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-math/include
     # input/Keys.hpp seul (enum, sans dependance) : table des touches partagee
     # par l'editeur et le jeu (visu/runtime/GlfwKeys.hpp), sans lier eliott-input.
     ${CMAKE_CURRENT_SOURCE_DIR}/extern/eliott-input/include
 )
-target_link_libraries(ee-format PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(ee-format PUBLIC nlohmann_json::nlohmann_json eliott::math)
 
 # Lien editeur <-> jeu (visu/ipc) : sockets Winsock sous Windows, shm_open
 # (librt) sous Linux.
@@ -98,7 +96,7 @@ add_library(ee-render STATIC
     src/systems/PickingSystem.cpp
 )
 # stb_image (chargement des textures) : prive, seul GLRenderer s'en sert.
-target_include_directories(ee-render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
+target_include_directories(ee-render SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
 target_link_libraries(ee-render PUBLIC
     ee-format
     glad::glad
@@ -125,6 +123,19 @@ target_link_libraries(ee-fsm PUBLIC
 )
 target_compile_features(ee-fsm PUBLIC cxx_std_20)
 
+option(EE_WARNINGS "Active les avertissements du compilateur sur les cibles du moteur" ON)
+function(ee_enable_warnings target)
+    if(EE_WARNINGS)
+        target_compile_options(${target} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wconversion -Wsign-conversion -Wshadow -Wpedantic>
+            $<$<CXX_COMPILER_ID:MSVC>:/W4>)
+    endif()
+endfunction()
+
+foreach(t ee-reflect ee-format ee-render ee-fsm)
+    ee_enable_warnings(${t})
+endforeach()
+
 if(NOT EE_BUILD_RUNTIME)
     return()
 endif()
@@ -133,6 +144,7 @@ add_library(ee-core STATIC
     src/systems/SystemScheduler.cpp
     src/reflect/SceneBind.cpp
 )
+ee_enable_warnings(ee-core)
 
 # ---------------------------------------------------------------------------
 # Sidecars des systemes moteur (include/visu/systems/<Nom>.json) : embarques
@@ -195,21 +207,6 @@ if(EE_BUILD_TESTS)
     target_link_libraries(ee-fsm-tests PRIVATE ee-fsm doctest::doctest)
     target_compile_definitions(ee-fsm-tests PRIVATE EE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME ee-fsm-tests COMMAND ee-fsm-tests)
-
-    add_executable(ee-math-tests
-        tests/math/main.cpp
-        tests/math/test_matrix.cpp
-        tests/math/test_quaternion.cpp
-        tests/math/test_matrix_transform.cpp
-        tests/math/test_matrix_camera.cpp
-        tests/math/test_matrix_apply.cpp
-        tests/math/test_matrix_inverse.cpp
-        tests/math/test_matrix_decompose.cpp
-    )
-    target_include_directories(ee-math-tests PRIVATE extern/eliott-math/include)
-    target_link_libraries(ee-math-tests PRIVATE doctest::doctest)
-    target_compile_features(ee-math-tests PRIVATE cxx_std_20)
-    add_test(NAME ee-math-tests COMMAND ee-math-tests)
 endif()
 
 # ---------------------------------------------------------------------------

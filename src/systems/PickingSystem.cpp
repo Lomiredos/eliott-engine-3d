@@ -12,8 +12,8 @@
 
 namespace
 {
-    using Vec3 = ee::math::Vector3<float>;
-    using Quat = ee::math::Quaternion;
+    using Vec3 = ee::math::Vector<3, float>;
+    using Quat = ee::math::Quaternion<float>;
 
     // Lecture d'un champ multi-type en float (bool/int/float -> float).
     float valueOf(const std::map<std::string, FieldValue> &_vals, const char *_key, float _def)
@@ -43,8 +43,8 @@ namespace
     bool sphereT(const Vec3 &_O, const Vec3 &_D, const Vec3 &_C, float _R, float &_t)
     {
         Vec3 oc = _O - _C;
-        float b = _D.Dot(oc);
-        float c = oc.Dot(oc) - _R * _R;
+        float b = dot(_D, oc);
+        float c = oc.lengthSq() - _R * _R;
         float disc = b * b - c;
         if (disc <= 0.0f)
             return false;
@@ -86,9 +86,9 @@ namespace
         Vec3 o{ol.x / radii.x, ol.y / radii.y, ol.z / radii.z};
         Vec3 d{dl.x / radii.x, dl.y / radii.y, dl.z / radii.z};
 
-        float a = d.Dot(d);
-        float b = 2.0f * o.Dot(d);
-        float c = o.Dot(o) - 1.0f;
+        float a = d.lengthSq();
+        float b = 2.0f * dot(o, d);
+        float c = o.lengthSq() - 1.0f;
         float disc = b * b - 4.0f * a * c;
         if (disc <= 0.0f || a <= 0.0f)
             return false;
@@ -206,23 +206,23 @@ namespace
 
         // Cylindre fini d'axe A->B (intersection puis clamp sur le segment).
         Vec3 axis = B - A;
-        float L = axis.Magnetude();
+        float L = axis.length();
         if (L > 1e-6f)
         {
             axis = axis / L;
             Vec3 oa = O - A;
-            Vec3 dPerp = D - axis * D.Dot(axis);
-            Vec3 mPerp = oa - axis * oa.Dot(axis);
-            float aa = dPerp.Dot(dPerp);
-            float bb = 2.0f * mPerp.Dot(dPerp);
-            float cc = mPerp.Dot(mPerp) - rad * rad;
+            Vec3 dPerp = D - axis * dot(D, axis);
+            Vec3 mPerp = oa - axis * dot(oa, axis);
+            float aa = dot(dPerp, dPerp);
+            float bb = 2.0f * dot(mPerp, dPerp);
+            float cc = dot(mPerp, mPerp) - rad * rad;
             if (aa > 1e-9f)
             {
                 float disc = bb * bb - 4.0f * aa * cc;
                 if (disc > 0.0f)
                 {
                     float tt = (-bb - std::sqrt(disc)) / (2.0f * aa);
-                    float proj = (oa + D * tt).Dot(axis); // position le long de l'axe
+                    float proj = dot(oa + D * tt, axis); // position le long de l'axe
                     if (tt > 0.0f && tt < best && proj >= 0.0f && proj <= L)
                     {
                         best = tt;

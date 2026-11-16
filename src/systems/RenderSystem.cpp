@@ -1,6 +1,6 @@
 #include "visu/systems/RenderSystem.hpp"
 
-#include "math/Vector3.hpp"
+#include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
 #include "visu/core/MeshStore.hpp"
 #include "visu/render/Renderer.hpp"
@@ -87,7 +87,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       continue;
 
     const ee::scene::Xform &wx = world[idx];
-    ee::math::Vector3<float> pos{wx.pos.x, wx.pos.y, wx.pos.z};
+    ee::math::Vector<3, float> pos{wx.pos.x, wx.pos.y, wx.pos.z};
     ee::math::Quaternion quat = wx.rot;
     float scx = wx.scale.x;
     float scy = wx.scale.y;
@@ -100,14 +100,14 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
 
     if (sp) {
       float radius = valueOf(sp->values, "Radius", 1.0f);
-      ee::math::Vector3<float> radii{radius * scx, radius * scy, radius * scz};
+      ee::math::Vector<3, float> radii{radius * scx, radius * scy, radius * scz};
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), pos, radii, quat, matFor({0.85f, 0.20f, 0.20f}));
     }
 
     if (rp) {
-        ee::math::Vector3<float> size{valueOf(rp->values, "Size.x", 1.0f) * scx,
-                                      valueOf(rp->values, "Size.y", 1.0f) * scy,
-                                      valueOf(rp->values, "Size.z", 1.0f) * scz};
+        ee::math::Vector<3, float> size{valueOf(rp->values, "Size.x", 1.0f) * scx,
+                                        valueOf(rp->values, "Size.y", 1.0f) * scy,
+                                        valueOf(rp->values, "Size.z", 1.0f) * scz};
         r.drawMesh(r.builtin(ee::render::Prim::Cube), pos, size, quat, matFor({0.85f, 0.20f, 0.20f}));
     }
 
@@ -119,12 +119,12 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       float hh = hgt * scy;
       ee::render::Material capCol = matFor({0.20f, 0.55f, 0.85f});
 
-      r.drawMesh(r.builtin(ee::render::Prim::Cylinder), pos, ee::math::Vector3<float>{rr, hh, rr}, quat, capCol);
+      r.drawMesh(r.builtin(ee::render::Prim::Cylinder), pos, ee::math::Vector<3, float>{rr, hh, rr}, quat, capCol);
 
-      ee::math::Vector3<float> off = quat.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-      ee::math::Vector3<float> top{pos.x + off.x, pos.y + off.y, pos.z + off.z};
-      ee::math::Vector3<float> bot{pos.x - off.x, pos.y - off.y, pos.z - off.z};
-      ee::math::Vector3<float> sphR{rr, rr, rr};
+      ee::math::Vector<3, float> off = quat.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
+      ee::math::Vector<3, float> top{pos.x + off.x, pos.y + off.y, pos.z + off.z};
+      ee::math::Vector<3, float> bot{pos.x - off.x, pos.y - off.y, pos.z - off.z};
+      ee::math::Vector<3, float> sphR{rr, rr, rr};
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), top, sphR, quat, capCol);
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), bot, sphR, quat, capCol);
     }
@@ -136,7 +136,7 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
         if (cm.gpu == 0)
           cm.gpu = r.createMesh(cm.verts.data(), (int)cm.verts.size(),
                                 cm.idx.data(), (int)cm.idx.size());
-        r.drawMesh(cm.gpu, pos, ee::math::Vector3<float>{scx, scy, scz}, quat, matFor({0.80f, 0.80f, 0.85f}));
+        r.drawMesh(cm.gpu, pos, ee::math::Vector<3, float>{scx, scy, scz}, quat, matFor({0.80f, 0.80f, 0.85f}));
       }
     }
 
@@ -155,9 +155,9 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       col.offset = {valueOf(cc->values, "OffSet.x", 0.0f),
                     valueOf(cc->values, "OffSet.y", 0.0f),
                     valueOf(cc->values, "OffSet.z", 0.0f)};
-      col.quat =
-          ee::math::Quaternion::fromEulerDeg(valueOf(cc->values, "Euler.x", 0.0f), valueOf(cc->values, "Euler.y", 0.0f),
-                                             valueOf(cc->values, "Euler.z", 0.0f));
+      col.quat = ee::math::Quaternion<float>::fromEulerDeg(valueOf(cc->values, "Euler.x", 0.0f),
+                                                           valueOf(cc->values, "Euler.y", 0.0f),
+                                                           valueOf(cc->values, "Euler.z", 0.0f));
       col.radius = valueOf(cc->values, "Radius", 1.0f);
       col.halfExtents = {valueOf(cc->values, "HalfExtents.x", 0.5f),
                          valueOf(cc->values, "HalfExtents.y", 0.5f),
@@ -168,53 +168,54 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
   }
 }
 
-void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat,
-                      ee::math::Vector3<float> scale, const ColliderWireDesc& col) {
+void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                      ee::math::Vector<3, float> scale, const ColliderWireDesc& col) {
     const float scx = scale.x, scy = scale.y, scz = scale.z;
 
-    ee::math::Vector3<float> offLocal{col.offset.x * scx, col.offset.y * scy, col.offset.z * scz};
+    ee::math::Vector<3, float> offLocal{col.offset.x * scx, col.offset.y * scy, col.offset.z * scz};
 
     ee::math::Quaternion qWorld = quat * col.quat;
 
-    ee::math::Vector3<float> offWorld = quat.rotate(offLocal);
-    ee::math::Vector3<float> cpos{pos.x + offWorld.x, pos.y + offWorld.y, pos.z + offWorld.z};
+    ee::math::Vector<3, float> offWorld = quat.rotate(offLocal);
+    ee::math::Vector<3, float> cpos{pos.x + offWorld.x, pos.y + offWorld.y, pos.z + offWorld.z};
     ee::Color3 wireCol{1.0f, 0.9f, 0.1f};
 
     if (col.shape == "Box") {
-        ee::math::Vector3<float> size{col.halfExtents.x * 2.0f * scx, col.halfExtents.y * 2.0f * scy,
-                                      col.halfExtents.z * 2.0f * scz};
+        ee::math::Vector<3, float> size{col.halfExtents.x * 2.0f * scx, col.halfExtents.y * 2.0f * scy,
+                                        col.halfExtents.z * 2.0f * scz};
         r.drawWireMesh(r.builtin(ee::render::Prim::Cube), cpos, size, qWorld, wireCol);
     } else if (col.shape == "Capsule") {
         float rr = col.radius * scx;
         float hh = col.height * scy;
-        r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder), cpos, ee::math::Vector3<float>{rr, hh, rr}, qWorld,
+        r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder), cpos, ee::math::Vector<3, float>{rr, hh, rr}, qWorld,
                        wireCol);
 
-        ee::math::Vector3<float> capOff = qWorld.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-        ee::math::Vector3<float> top{cpos.x + capOff.x, cpos.y + capOff.y, cpos.z + capOff.z};
-        ee::math::Vector3<float> bot{cpos.x - capOff.x, cpos.y - capOff.y, cpos.z - capOff.z};
-        ee::math::Vector3<float> sphR{rr, rr, rr};
+        ee::math::Vector<3, float> capOff = qWorld.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
+        ee::math::Vector<3, float> top{cpos.x + capOff.x, cpos.y + capOff.y, cpos.z + capOff.z};
+        ee::math::Vector<3, float> bot{cpos.x - capOff.x, cpos.y - capOff.y, cpos.z - capOff.z};
+        ee::math::Vector<3, float> sphR{rr, rr, rr};
 
         // Le dome (Hemisphere) est bombe vers +Y en local : correct tel
         // quel pour le bout du haut, il faut le retourner (180 deg sur X,
         // APRES le monde) pour qu'il bombe vers -Y pour le bout du bas.
-        ee::math::Quaternion qFlip = ee::math::Quaternion::fromAxisAngle({1.0f, 0.0f, 0.0f}, 3.14159265358979323846f);
+        ee::math::Quaternion qFlip =
+            ee::math::Quaternion<float>::fromAxisAngle({1.0f, 0.0f, 0.0f}, 3.14159265358979323846f);
         ee::math::Quaternion botEuler = qWorld * qFlip;
 
         r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), top, sphR, qWorld, wireCol);
         r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), bot, sphR, botEuler, wireCol);
     } else { // "Sphere" par defaut
-        ee::math::Vector3<float> radii{col.radius * scx, col.radius * scy, col.radius * scz};
+        ee::math::Vector<3, float> radii{col.radius * scx, col.radius * scy, col.radius * scz};
         r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), cpos, radii, qWorld, wireCol);
     }
 }
 } // namespace ee::systems
 
 namespace ee::systems {
-    ee::render::Camera cameraFromTransform(ee::math::Vector3<float> pos, ee::math::Quaternion quat, float fovDeg,
-                                           float nearZ, float farZ) {
+    ee::render::Camera cameraFromTransform(ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                                           float fovDeg, float nearZ, float farZ) {
 
-        ee::math::Vector3<float> f = quat.forward(); // -Z local
+        ee::math::Vector<3, float> f = quat.forward(); // -Z local
         float fy = f.y < -1.0f ? -1.0f : (f.y > 1.0f ? 1.0f : f.y);
 
         ee::render::Camera cam;
@@ -275,17 +276,18 @@ bool sceneCamera(const SceneInfo &scene, ee::render::Camera &out) {
   return true;
 }
 
-void drawCameraGizmo(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat, bool selected) {
+void drawCameraGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                     bool selected) {
     ee::Color3 col = selected ? ee::Color3{1.0f, 0.9f, 0.1f} : ee::Color3{0.55f, 0.75f, 1.0f};
     // Boitier, centre sur l'entite.
-    r.drawWireMesh(r.builtin(ee::render::Prim::Cube), pos, ee::math::Vector3<float>{0.4f, 0.3f, 0.5f}, quat, col);
+    r.drawWireMesh(r.builtin(ee::render::Prim::Cube), pos, ee::math::Vector<3, float>{0.4f, 0.3f, 0.5f}, quat, col);
 
     // Objectif : cylindre (axe Y) couche le long du -Z local, devant le boitier.
-    ee::math::Quaternion qLens = quat * ee::math::Quaternion::fromEulerDeg(90.0f, 0.0f, 0.0f);
-    ee::math::Vector3<float> off = quat.forward() * 0.35f;
+    ee::math::Quaternion qLens = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
+    ee::math::Vector<3, float> off = quat.forward() * 0.35f;
     r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
-                   ee::math::Vector3<float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
-                   ee::math::Vector3<float>{0.12f, 0.2f, 0.12f}, qLens, col);
+                   ee::math::Vector<3, float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                   ee::math::Vector<3, float>{0.12f, 0.2f, 0.12f}, qLens, col);
 }
 } // namespace ee::systems
 
@@ -335,12 +337,12 @@ ee::render::Lights sceneLights(const SceneInfo &scene) {
       ee::fromHex(stringOf(ci.values, "Color"), c);
       ee::Color3 col{c.r, c.g, c.b};
       if (ci.name == "DirectionalLightComponent" && !sunSet) {
-        ee::math::Vector3<float> f = world[i].rot.forward();
-        lights.sun->dir = {f.x, f.y, f.z};
-        lights.sun->color = col;
-        lights.sun->intensity = valueOf(ci.values, "Intensity", 2.5f);
-        lights.sun->castShadows = valueOf(ci.values, "Shadows", 1.0f) != 0.0f;
-        sunSet = anyLight = true;
+          ee::math::Vector<3, float> f = world[i].rot.forward();
+          lights.sun->dir = {f.x, f.y, f.z};
+          lights.sun->color = col;
+          lights.sun->intensity = valueOf(ci.values, "Intensity", 2.5f);
+          lights.sun->castShadows = valueOf(ci.values, "Shadows", 1.0f) != 0.0f;
+          sunSet = anyLight = true;
       } else if (ci.name == "PointLightComponent") {
         lights.points.push_back({{world[i].pos.x, world[i].pos.y, world[i].pos.z},
                                  col,
@@ -359,20 +361,20 @@ ee::render::Lights sceneLights(const SceneInfo &scene) {
   return lights;
 }
 
-void drawLightGizmo(ee::render::IRenderer& r, ee::math::Vector3<float> pos, ee::math::Quaternion quat, bool directional,
-                    float range, bool selected) {
+void drawLightGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee::math::Quaternion<float> quat,
+                    bool directional, float range, bool selected) {
     ee::Color3 col = selected ? ee::Color3{1.0f, 0.9f, 0.1f} : ee::Color3{1.0f, 0.85f, 0.4f};
-    r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos, ee::math::Vector3<float>{0.2f, 0.2f, 0.2f}, quat, col);
+    r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos, ee::math::Vector<3, float>{0.2f, 0.2f, 0.2f}, quat, col);
     if (directional) {
         // Fleche : un long cylindre fin dans la direction de la lumiere (-Z local).
-        ee::math::Quaternion qRay = quat * ee::math::Quaternion::fromEulerDeg(90.0f, 0.0f, 0.0f);
-        ee::math::Vector3<float> off = quat.forward() * 0.7f;
+        ee::math::Quaternion qRay = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
+        ee::math::Vector<3, float> off = quat.forward() * 0.7f;
         r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
-                       ee::math::Vector3<float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
-                       ee::math::Vector3<float>{0.03f, 1.0f, 0.03f}, qRay, col);
+                       ee::math::Vector<3, float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                       ee::math::Vector<3, float>{0.03f, 1.0f, 0.03f}, qRay, col);
     } else if (selected && range > 0.0f) {
         // Portee de l'ampoule.
-        r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos, ee::math::Vector3<float>{range, range, range}, quat,
+        r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos, ee::math::Vector<3, float>{range, range, range}, quat,
                        ee::Color3{1.0f, 0.85f, 0.4f});
     }
 }
