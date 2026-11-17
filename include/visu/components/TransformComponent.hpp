@@ -20,9 +20,9 @@ struct TransformComponent
     // Axes unitaires tires de euler (convention du moteur : forward = -Z).
     // Comme euler, ils sont LOCAUX : pour une entite avec parent, prendre
     // ee::scene::worldXform(world, e).rot.forward() / up() / right().
-    ee::math::Quaternion getRotation() const
+    ee::math::Quaternion<float> getRotation() const
     {
-        return ee::math::Quaternion::fromEulerDeg(euler.x, euler.y, euler.z);
+        return ee::math::Quaternion<float>::fromEulerDeg(euler.x, euler.y, euler.z);
     }
     ee::math::Vector<3, float> getForward() const { return getRotation().forward(); }
     ee::math::Vector<3, float> getUp() const { return getRotation().up(); }

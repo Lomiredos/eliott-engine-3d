@@ -80,11 +80,11 @@ namespace
         float R = valueOf(_shape.values, "Radius", 1.0f);
         Vec3 radii{R * _scale.x, R * _scale.y, R * _scale.z};
 
-        Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
+        const Quat inv = _rot.conjugate();
         Vec3 ol = inv.rotate(_ray.origin - _center);
         Vec3 dl = inv.rotate(_ray.dir);
-        Vec3 o{ol.x / radii.x, ol.y / radii.y, ol.z / radii.z};
-        Vec3 d{dl.x / radii.x, dl.y / radii.y, dl.z / radii.z};
+        Vec3 o = ol / radii;
+        Vec3 d = dl / radii;
 
         float a = d.lengthSq();
         float b = 2.0f * dot(o, d);
@@ -110,7 +110,7 @@ namespace
         float d = valueOf(_shape.values, "Size.z", 1.0f) * _scale.z;
 
         // Rotation inverse = conjugue (quaternion unitaire).
-        Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
+        const Quat inv = _rot.conjugate();
         Vec3 ol = inv.rotate(_ray.origin - _center); // origine en local
         Vec3 dl = inv.rotate(_ray.dir);              // direction en local
 
@@ -150,11 +150,11 @@ namespace
         if (!m.valid)
             return false;
 
-        Quat inv{_rot.w, -_rot.x, -_rot.y, -_rot.z};
+        const Quat inv = _rot.conjugate();
         Vec3 ol = inv.rotate(_ray.origin - _center);
         Vec3 dl = inv.rotate(_ray.dir);
-        Vec3 o{ol.x / _scale.x, ol.y / _scale.y, ol.z / _scale.z};
-        Vec3 d{dl.x / _scale.x, dl.y / _scale.y, dl.z / _scale.z};
+        Vec3 o = ol / _scale;
+        Vec3 d = dl / _scale;
 
         float tx1 = (m.aabbMin.x - o.x) / d.x, tx2 = (m.aabbMax.x - o.x) / d.x;
         float ex = std::min(tx1, tx2), sx = std::max(tx1, tx2);

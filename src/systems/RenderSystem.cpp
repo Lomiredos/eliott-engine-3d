@@ -1,4 +1,5 @@
 #include "visu/systems/RenderSystem.hpp"
+#include "math/Constants.hpp"
 
 #include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
@@ -87,8 +88,8 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       continue;
 
     const ee::scene::Xform &wx = world[idx];
-    ee::math::Vector<3, float> pos{wx.pos.x, wx.pos.y, wx.pos.z};
-    ee::math::Quaternion quat = wx.rot;
+    ee::math::Vector<3, float> pos = wx.pos;
+    ee::math::Quaternion<float> quat = wx.rot;
     float scx = wx.scale.x;
     float scy = wx.scale.y;
     float scz = wx.scale.z;
@@ -122,8 +123,8 @@ void renderScene(ee::render::IRenderer &r, const SceneInfo &scene,
       r.drawMesh(r.builtin(ee::render::Prim::Cylinder), pos, ee::math::Vector<3, float>{rr, hh, rr}, quat, capCol);
 
       ee::math::Vector<3, float> off = quat.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-      ee::math::Vector<3, float> top{pos.x + off.x, pos.y + off.y, pos.z + off.z};
-      ee::math::Vector<3, float> bot{pos.x - off.x, pos.y - off.y, pos.z - off.z};
+      ee::math::Vector<3, float> top = pos + off;
+      ee::math::Vector<3, float> bot = pos - off;
       ee::math::Vector<3, float> sphR{rr, rr, rr};
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), top, sphR, quat, capCol);
       r.drawMesh(r.builtin(ee::render::Prim::Sphere), bot, sphR, quat, capCol);
@@ -174,10 +175,10 @@ void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, 
 
     ee::math::Vector<3, float> offLocal{col.offset.x * scx, col.offset.y * scy, col.offset.z * scz};
 
-    ee::math::Quaternion qWorld = quat * col.quat;
+    ee::math::Quaternion<float> qWorld = quat * col.quat;
 
     ee::math::Vector<3, float> offWorld = quat.rotate(offLocal);
-    ee::math::Vector<3, float> cpos{pos.x + offWorld.x, pos.y + offWorld.y, pos.z + offWorld.z};
+    ee::math::Vector<3, float> cpos = pos + offWorld;
     ee::Color3 wireCol{1.0f, 0.9f, 0.1f};
 
     if (col.shape == "Box") {
@@ -191,16 +192,16 @@ void drawColliderWire(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, 
                        wireCol);
 
         ee::math::Vector<3, float> capOff = qWorld.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-        ee::math::Vector<3, float> top{cpos.x + capOff.x, cpos.y + capOff.y, cpos.z + capOff.z};
-        ee::math::Vector<3, float> bot{cpos.x - capOff.x, cpos.y - capOff.y, cpos.z - capOff.z};
+        ee::math::Vector<3, float> top = cpos + capOff;
+        ee::math::Vector<3, float> bot = cpos - capOff;
         ee::math::Vector<3, float> sphR{rr, rr, rr};
 
         // Le dome (Hemisphere) est bombe vers +Y en local : correct tel
         // quel pour le bout du haut, il faut le retourner (180 deg sur X,
         // APRES le monde) pour qu'il bombe vers -Y pour le bout du bas.
-        ee::math::Quaternion qFlip =
-            ee::math::Quaternion<float>::fromAxisAngle({1.0f, 0.0f, 0.0f}, 3.14159265358979323846f);
-        ee::math::Quaternion botEuler = qWorld * qFlip;
+        ee::math::Quaternion<float> qFlip =
+            ee::math::Quaternion<float>::fromAxisAngle({1.0f, 0.0f, 0.0f}, ee::math::constants::pi<float>);
+        ee::math::Quaternion<float> botEuler = qWorld * qFlip;
 
         r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), top, sphR, qWorld, wireCol);
         r.drawWireMesh(r.builtin(ee::render::Prim::Hemisphere), bot, sphR, botEuler, wireCol);
@@ -245,7 +246,7 @@ bool entityCamera(const SceneInfo &scene, int index, ee::render::Camera &out) {
     return false;
   // Position/rotation MONDE (une camera peut etre l'enfant d'une entite).
   ee::scene::Xform wx = ee::scene::sceneWorldXforms(scene)[index];
-  out = cameraFromTransform({wx.pos.x, wx.pos.y, wx.pos.z}, wx.rot, valueOf(cam->values, "Fov", 45.0f),
+  out = cameraFromTransform(wx.pos, wx.rot, valueOf(cam->values, "Fov", 45.0f),
                             valueOf(cam->values, "NearZ", 0.1f), valueOf(cam->values, "FarZ", 200.0f));
   return true;
 }
@@ -283,10 +284,10 @@ void drawCameraGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, e
     r.drawWireMesh(r.builtin(ee::render::Prim::Cube), pos, ee::math::Vector<3, float>{0.4f, 0.3f, 0.5f}, quat, col);
 
     // Objectif : cylindre (axe Y) couche le long du -Z local, devant le boitier.
-    ee::math::Quaternion qLens = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
+    ee::math::Quaternion<float> qLens = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
     ee::math::Vector<3, float> off = quat.forward() * 0.35f;
     r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
-                   ee::math::Vector<3, float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                   pos + off,
                    ee::math::Vector<3, float>{0.12f, 0.2f, 0.12f}, qLens, col);
 }
 } // namespace ee::systems
@@ -338,7 +339,7 @@ ee::render::Lights sceneLights(const SceneInfo &scene) {
       ee::Color3 col{c.r, c.g, c.b};
       if (ci.name == "DirectionalLightComponent" && !sunSet) {
           ee::math::Vector<3, float> f = world[i].rot.forward();
-          lights.sun->dir = {f.x, f.y, f.z};
+          lights.sun->dir = f;
           lights.sun->color = col;
           lights.sun->intensity = valueOf(ci.values, "Intensity", 2.5f);
           lights.sun->castShadows = valueOf(ci.values, "Shadows", 1.0f) != 0.0f;
@@ -367,10 +368,10 @@ void drawLightGizmo(ee::render::IRenderer& r, ee::math::Vector<3, float> pos, ee
     r.drawWireMesh(r.builtin(ee::render::Prim::Sphere), pos, ee::math::Vector<3, float>{0.2f, 0.2f, 0.2f}, quat, col);
     if (directional) {
         // Fleche : un long cylindre fin dans la direction de la lumiere (-Z local).
-        ee::math::Quaternion qRay = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
+        ee::math::Quaternion<float> qRay = quat * ee::math::Quaternion<float>::fromEulerDeg(90.0f, 0.0f, 0.0f);
         ee::math::Vector<3, float> off = quat.forward() * 0.7f;
         r.drawWireMesh(r.builtin(ee::render::Prim::Cylinder),
-                       ee::math::Vector<3, float>{pos.x + off.x, pos.y + off.y, pos.z + off.z},
+                       pos + off,
                        ee::math::Vector<3, float>{0.03f, 1.0f, 0.03f}, qRay, col);
     } else if (selected && range > 0.0f) {
         // Portee de l'ampoule.

@@ -51,7 +51,7 @@ inline Contact SphereToSphere(const ee::math::Vector<3, float>& _centerA, const 
 
 inline Contact SphereToBox(const ee::math::Vector<3, float>& _sphereCenter, float _r,
                            const ee::math::Vector<3, float>& _boxCenter, const ee::math::Vector<3, float>& _half,
-                           const ee::math::Quaternion& _boxRot) {
+                           const ee::math::Quaternion<float>& _boxRot) {
 
     ee::math::Vector<3, float> d = _sphereCenter - _boxCenter;
     ee::math::Vector<3, float> local{dot(d, _boxRot.right()), dot(d, _boxRot.up()), dot(d, _boxRot.back())};
@@ -94,12 +94,10 @@ inline Contact SphereToBox(const ee::math::Vector<3, float>& _sphereCenter, floa
 // (3 axes de A, 3 de B, 9 produits croises). Le contact garde l'axe de plus
 // faible penetration ; la normale va de A vers B, comme les autres tests.
 inline Contact BoxToBox(const ee::math::Vector<3, float>& _centerA, const ee::math::Vector<3, float>& _halfA,
-                        const ee::math::Quaternion& _rotA, const ee::math::Vector<3, float>& _centerB,
-                        const ee::math::Vector<3, float>& _halfB, const ee::math::Quaternion& _rotB) {
+                        const ee::math::Quaternion<float>& _rotA, const ee::math::Vector<3, float>& _centerB,
+                        const ee::math::Vector<3, float>& _halfB, const ee::math::Quaternion<float>& _rotB) {
     const ee::math::Vector<3, float> axA[3] = {_rotA.right(), _rotA.up(), _rotA.back()};
     const ee::math::Vector<3, float> axB[3] = {_rotB.right(), _rotB.up(), _rotB.back()};
-    const float hA[3] = {_halfA.x, _halfA.y, _halfA.z};
-    const float hB[3] = {_halfB.x, _halfB.y, _halfB.z};
     ee::math::Vector<3, float> d = _centerB - _centerA;
 
     Contact best;
@@ -112,9 +110,9 @@ inline Contact BoxToBox(const ee::math::Vector<3, float>& _centerA, const ee::ma
         _axis = _axis / std::sqrt(len2);
 
         float rA = 0.0f, rB = 0.0f;
-        for (int k = 0; k < 3; ++k) {
-            rA += hA[k] * std::fabs(dot(axA[k], _axis));
-            rB += hB[k] * std::fabs(dot(axB[k], _axis));
+        for (std::size_t k = 0; k < 3; ++k) {
+            rA += _halfA[k] * std::fabs(dot(axA[k], _axis));
+            rB += _halfB[k] * std::fabs(dot(axB[k], _axis));
         }
         float dist = dot(d, _axis);
         float overlap = rA + rB - std::fabs(dist);
@@ -215,7 +213,7 @@ inline Contact CapsuleToCapsule(const ee::math::Vector<3, float>& _a0, const ee:
 // le point (min trouve ou extremites) qui penetre le plus.
 inline Contact CapsuleToBox(const ee::math::Vector<3, float>& _p0, const ee::math::Vector<3, float>& _p1, float _r,
                             const ee::math::Vector<3, float>& _boxCenter, const ee::math::Vector<3, float>& _half,
-                            const ee::math::Quaternion& _boxRot) {
+                            const ee::math::Quaternion<float>& _boxRot) {
     ee::math::Vector<3, float> seg = _p1 - _p0;
 
     auto dist2ToBox = [&](float _t) {
@@ -257,7 +255,7 @@ inline Contact CapsuleToBox(const ee::math::Vector<3, float>& _p0, const ee::mat
 struct WorldCollider {
   ColliderShape shape = ColliderShape::Sphere;
   ee::math::Vector<3, float> center;
-  ee::math::Quaternion rot;
+  ee::math::Quaternion<float> rot;
   ee::math::Vector<3, float> half; // Box
   float radius = 0.0f;           // Sphere, Capsule
   ee::math::Vector<3, float> p0; // Capsule : extremites du segment
@@ -269,8 +267,8 @@ inline WorldCollider toWorld(const ee::scene::Xform &_tf,
                              const ColliderComponent &_cc) {
   WorldCollider w;
   w.shape = _cc.shape;
-  const ee::math::Quaternion &qTf = _tf.rot;
-  w.rot = qTf * ee::math::Quaternion::fromEulerDeg(_cc.euler.x, _cc.euler.y,
+  const ee::math::Quaternion<float> &qTf = _tf.rot;
+  w.rot = qTf * ee::math::Quaternion<float>::fromEulerDeg(_cc.euler.x, _cc.euler.y,
                                                    _cc.euler.z);
   w.center = _tf.pos + qTf.rotate(_cc.offset * _tf.scale);
   w.half = _cc.halfExtents * _tf.scale;

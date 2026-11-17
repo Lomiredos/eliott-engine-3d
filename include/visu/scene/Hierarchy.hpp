@@ -45,7 +45,7 @@ namespace ee::scene
             return;
         }
         Xform p = worldXform(_w, t.parent.id);
-        ee::math::Quaternion inv{p.rot.w, -p.rot.x, -p.rot.y, -p.rot.z};
+        const ee::math::Quaternion<float> inv = p.rot.conjugate();
         ee::math::Vector<3, float> d = inv.rotate(_delta);
         auto safeDiv = [](float _a, float _b)
         { return std::fabs(_b) > 1e-6f ? _a / _b : _a; };

@@ -48,7 +48,7 @@ namespace ee::scene
             {
                 const DirectionalLightComponent &l = *_w.getComponent<DirectionalLightComponent>(e);
                 ee::math::Vector<3, float> f = worldXform(_w, e).rot.forward();
-                lights.sun->dir = {f.x, f.y, f.z};
+                lights.sun->dir = f;
                 lights.sun->color = {l.color.r, l.color.g, l.color.b};
                 lights.sun->intensity = l.intensity;
                 lights.sun->castShadows = l.shadows;
@@ -58,7 +58,7 @@ namespace ee::scene
             {
                 const PointLightComponent &l = *_w.getComponent<PointLightComponent>(e);
                 Xform wx = worldXform(_w, e);
-                lights.points.push_back({{wx.pos.x, wx.pos.y, wx.pos.z},
+                lights.points.push_back({wx.pos,
                                          {l.color.r, l.color.g, l.color.b},
                                          l.intensity,
                                          l.range,
@@ -128,8 +128,8 @@ namespace ee::scene
                             wx.rot, capCol);
 
                 ee::math::Vector<3, float> off = wx.rot.rotate({0.0f, 1.0f, 0.0f}) * (hh * 0.5f);
-                ee::math::Vector<3, float> top{wx.pos.x + off.x, wx.pos.y + off.y, wx.pos.z + off.z};
-                ee::math::Vector<3, float> bot{wx.pos.x - off.x, wx.pos.y - off.y, wx.pos.z - off.z};
+                ee::math::Vector<3, float> top = wx.pos + off;
+                ee::math::Vector<3, float> bot = wx.pos - off;
                 ee::math::Vector<3, float> sphR{rr, rr, rr};
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), top, sphR, wx.rot, capCol);
                 _r.drawMesh(_r.builtin(ee::render::Prim::Sphere), bot, sphR, wx.rot, capCol);
@@ -154,10 +154,10 @@ namespace ee::scene
                 int shape = static_cast<int>(cc.shape);
                 if (shape >= 0 && shape < EnumNames<ColliderShape>::count)
                     col.shape = EnumNames<ColliderShape>::values[shape];
-                col.offset = {cc.offset.x, cc.offset.y, cc.offset.z};
-                col.quat = ee::math::Quaternion::fromEulerDeg(cc.euler);
+                col.offset = cc.offset;
+                col.quat = ee::math::Quaternion<float>::fromEulerDeg(cc.euler);
                 col.radius = cc.radius;
-                col.halfExtents = {cc.halfExtents.x, cc.halfExtents.y, cc.halfExtents.z};
+                col.halfExtents = cc.halfExtents;
                 col.height = cc.height;
                 ee::systems::drawColliderWire(_r, wx.pos, wx.rot, {scx, scy, scz}, col);
             }
@@ -177,7 +177,7 @@ namespace ee::scene
             const CameraComponent &c = *_w.getComponent<CameraComponent>(e);
             const Xform wx = worldXform(_w, e);
             ee::render::Camera cam =
-                ee::systems::cameraFromTransform({wx.pos.x, wx.pos.y, wx.pos.z}, wx.rot, c.fov, c.nearZ, c.farZ);
+                ee::systems::cameraFromTransform(wx.pos, wx.rot, c.fov, c.nearZ, c.farZ);
             if (c.isMain)
                 active.push_back(cam);
             else if (first.empty())

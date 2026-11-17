@@ -57,7 +57,7 @@ namespace ee::scene {
     {
         auto safeDiv = [](float _a, float _b)
         { return std::fabs(_b) > 1e-6f ? _a / _b : _a; };
-        ee::math::Quaternion inv{_parent.rot.w, -_parent.rot.x, -_parent.rot.y, -_parent.rot.z};
+        const ee::math::Quaternion<float> inv = _parent.rot.conjugate();
         ee::math::Vector<3, float> p = inv.rotate(_world.pos - _parent.pos);
 
         Xform l;

@@ -1,4 +1,5 @@
 #include "visu/render/GLRenderer.hpp"
+#include "math/Constants.hpp"
 #include "math/Matrix.hpp"
 #include "math/Vector.hpp"
 #include "visu/core/Color3.hpp"
@@ -331,7 +332,11 @@ void main() {}
 
     // Faces du cube d'ombre d'une lampe (direction, haut) : meme ordre et
     // memes vecteurs que kFaceF/kFaceU du shader.
-    const float kCubeFaces[6][2][3] = {
+    struct CubeFace {
+        ee::math::Vector<3, float> dir;
+        ee::math::Vector<3, float> up;
+    };
+    constexpr CubeFace kCubeFaces[6] = {
         {{1, 0, 0}, {0, 1, 0}}, {{-1, 0, 0}, {0, 1, 0}}, {{0, 1, 0}, {0, 0, 1}},
         {{0, -1, 0}, {0, 0, 1}}, {{0, 0, 1}, {0, 1, 0}}, {{0, 0, -1}, {0, 1, 0}}};
     const float kPointShadowNear = 0.05f;
@@ -509,7 +514,7 @@ namespace ee::render
         m_pointRows = 1;
 
         // --- Meshes integres : sphere, cube, cylindre (unitaires) ---
-        const float PI = 3.14159265358979323846f;
+        constexpr float PI = ee::math::constants::pi<float>;
 
         // Sphere UV unitaire (position == normale).
         {
@@ -784,13 +789,13 @@ namespace ee::render
             return;
 
         // Matrices derivees de la camera-donnee (aspect = celui de la vue)
-        ee::math::Vector<3, float> eye = {cam.pos.x, cam.pos.y, cam.pos.z};
+        ee::math::Vector<3, float> eye = cam.pos;
         ee::math::Vector<3, float> fwd;
         forwardFrom(cam.yaw, cam.pitch, fwd);
-        ee::math::Vector<3, float> ctr = {eye.x + fwd.x, eye.y + fwd.y, eye.z + fwd.z};
+        ee::math::Vector<3, float> ctr = eye + fwd;
         ee::math::Vector<3, float> up = {0.0f, 1.0f, 0.0f};
         ee::math::Matrix<4, float> proj = ee::math::Matrix<4, float>::perspective(
-            cam.fovDeg * 3.14159265f / 180.0f, (float)v.w / (float)v.h, cam.nearZ, cam.farZ);
+            cam.fovDeg * ee::math::constants::degToRad<float>, (float)v.w / (float)v.h, cam.nearZ, cam.farZ);
         ee::math::Matrix<4, float> view = ee::math::Matrix<4, float>::lookAt(eye, ctr, up);
         ee::math::Matrix<4, float> vp = proj * view;
 
@@ -854,8 +859,7 @@ namespace ee::render
         for (int i = 0; i < static_cast<int>(m_lights.points.size()); ++i)
         {
             const PointLight &p = m_lights.points[i];
-            float dx = p.pos.x - m_camPos.x, dy = p.pos.y - m_camPos.y, dz = p.pos.z - m_camPos.z;
-            order.push_back({std::sqrt(dx * dx + dy * dy + dz * dz) - p.range, i});
+            order.push_back({distance(p.pos, m_camPos) - p.range, i});
         }
         std::stable_sort(order.begin(), order.end(),
                          [](const auto &_a, const auto &_b) { return _a.first < _b.first; });
@@ -879,8 +883,8 @@ namespace ee::render
         glUniform3f(m_uAmbient, c.x, c.y, c.z);
         glUniform1i(m_uSunOn, m_lights.sun ? 1 : 0);
         if (m_lights.sun) {
-            float d[3] = {m_lights.sun->dir.x, m_lights.sun->dir.y, m_lights.sun->dir.z};
-            glUniform3fv(m_uSunDir, 1, d);
+            const ee::math::Vector<3, float>& d = m_lights.sun->dir;
+            glUniform3f(m_uSunDir, d.x, d.y, d.z);
             c = linearColor(m_lights.sun->color, m_lights.sun->intensity);
             glUniform3f(m_uSunColor, c.x, c.y, c.z);
         }
@@ -1082,8 +1086,7 @@ namespace ee::render
         q.mesh = mesh;
         q.mat = mat;
         queuedTransform(pos, scale, rot, m_meshes[mesh - 1].radius, q.model, q.pos, q.radius);
-        float dx = pos.x - m_camPos.x, dy = pos.y - m_camPos.y, dz = pos.z - m_camPos.z;
-        q.dist2 = dx * dx + dy * dy + dz * dz;
+        q.dist2 = distanceSq(pos, m_camPos);
         m_queue.push_back(q);
     }
 
@@ -1146,7 +1149,7 @@ namespace ee::render
         const float D = m_settings.sun.distance;
         const float h = D * 0.5f;
         ee::math::Vector<3, float> dir = m_lights.sun->dir;
-        dir.normalize();
+        dir = dir.normalizedOr([] {});
 
         ee::math::Vector<3, float> up = {0.0f, 1.0f, 0.0f};
         if (std::fabs(dir.y) > 0.99f) {
@@ -1195,21 +1198,18 @@ namespace ee::render
             ee::math::Vector<3, float> eye = p.pos;
             float range = std::max(p.range, kPointShadowNear * 2.0f);
             ee::math::Matrix<4, float> proj =
-                ee::math::Matrix<4, float>::perspective(3.14159265f * 0.5f, 1.0f, kPointShadowNear, range);
+                ee::math::Matrix<4, float>::perspective(ee::math::constants::halfPi<float>, 1.0f, kPointShadowNear, range);
             for (int f = 0; f < 6; ++f)
             {
-                const float *F = kCubeFaces[f][0];
-                ee::math::Vector<3, float> ctr = {eye.x + F[0], eye.y + F[1], eye.z + F[2]};
-                ee::math::Vector<3, float> faces = {kCubeFaces[f][1][0], kCubeFaces[f][1][1], kCubeFaces[f][1][2]};
-                ee::math::Matrix<4, float> vp = proj * ee::math::Matrix<4, float>::lookAt(eye, ctr, faces);
+                const CubeFace& face = kCubeFaces[f];
+                ee::math::Matrix<4, float> vp = proj * ee::math::Matrix<4, float>::lookAt(eye, eye + face.dir, face.up);
                 glViewport(f * m_pointTile, row * m_pointTile, m_pointTile, m_pointTile);
                 for (const Queued &q : m_queue)
                 {
                     if (q.kind != DrawKind::Opaque)
                         continue;
-                    float dx = q.pos.x - eye.x, dy = q.pos.y - eye.y, dz = q.pos.z - eye.z;
                     float reach = range + q.radius;
-                    if (dx * dx + dy * dy + dz * dz > reach * reach)
+                    if (distanceSq(q.pos, eye) > reach * reach)
                         continue; // trop loin pour etre eclaire par cette lampe
                     drawDepth(q, vp);
                 }

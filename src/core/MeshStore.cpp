@@ -93,7 +93,7 @@ ee::core::CpuMesh loadObj(const std::string &_path) {
             continue;
 
           // Normale : celle du .obj si dispo, sinon normale de face.
-          Vec3 faceN = cross((pos[1] - pos[0]), (pos[2] - pos[0])).normalized();
+          Vec3 faceN = cross(pos[1] - pos[0], pos[2] - pos[0]).normalizedOr([] {});
           for (int k = 0; k < 3; ++k) {
             Vec3 n = (ni[k] >= 0 && ni[k] < (int)normals.size())
                          ? normals[ni[k]]
